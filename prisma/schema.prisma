@@ -28,7 +28,6 @@ model PipelineRun {
   logsText   String
   pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
   stages     Stage[]
-  insights   Insight[] @relation("PipelineRunInsights")
 }
 
 model Stage {
@@ -51,7 +50,6 @@ model Insight {
   riskImpact       String
   relatedChange    String
   createdAt        DateTime @default(now())
-  pipelineRun      PipelineRun? @relation("PipelineRunInsights", fields: [entityId], references: [id], map: "pipeline_run_fk")
 }
 
 model Activity {
