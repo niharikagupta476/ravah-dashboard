@@ -28,7 +28,6 @@ model PipelineRun {
   logsText   String
   pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
   stages     Stage[]
-  insights   Insight[] @relation("PipelineRunInsights")
 }
 
 model Stage {
