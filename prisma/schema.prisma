@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Pipeline {
+  id          String        @id @default(cuid())
+  name        String
+  service     String
+  env         String
+  status      String
+  lastRunAt   DateTime
+  durationSec Int
+  owner       String
+  runs        PipelineRun[]
+}
+
+model PipelineRun {
+  id         String   @id @default(cuid())
+  pipelineId String
+  status     String
+  startedAt  DateTime
+  endedAt    DateTime?
+  logsText   String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+  stages     Stage[]
+}
+
+model Stage {
+  id            String      @id @default(cuid())
+  pipelineRunId String
+  name          String
+  status        String
+  errorCode     String?
+  errorMessage  String?
+  run           PipelineRun @relation(fields: [pipelineRunId], references: [id])
+}
+
+model Insight {
+  id               String   @id @default(cuid())
+  entityType       String
+  entityId         String
+  rootCause        String
+  confidence       String
+  suggestedFixJson String
+  riskImpact       String
+  relatedChange    String
+  createdAt        DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  message    String
+  createdAt  DateTime @default(now())
+  entityType String
+  entityId   String
+}
+
+model AlertGroup {
+  id         String          @id @default(cuid())
+  name       String
+  service    String
+  env        String
+  severity   String
+  count      Int
+  lastSeenAt DateTime
+  status     String
+  instances  AlertInstance[]
+}
+
+model AlertInstance {
+  id           String     @id @default(cuid())
+  alertGroupId String
+  timestamp    DateTime
+  message      String
+  fingerprint  String
+  group        AlertGroup @relation(fields: [alertGroupId], references: [id])
+}
+
+model Incident {
+  id         String          @id @default(cuid())
+  title      String
+  env        String
+  severity   String
+  status     String
+  startedAt  DateTime
+  resolvedAt DateTime?
+  owner      String
+  events     IncidentEvent[]
+}
+
+model IncidentEvent {
+  id         String   @id @default(cuid())
+  incidentId String
+  timestamp  DateTime
+  type       String
+  message    String
+  incident   Incident @relation(fields: [incidentId], references: [id])
+}
