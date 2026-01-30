@@ -47,7 +47,7 @@ async function main() {
         createMany: {
           data: [
             { name: "Build", status: "SUCCESS" },
-            { name: "Test", status: "SUCCESS" },
+            { name: "Tests", status: "SUCCESS" },
             {
               name: "Deploy",
               status: "FAILED",
@@ -71,7 +71,7 @@ async function main() {
         createMany: {
           data: [
             { name: "Build", status: "SUCCESS" },
-            { name: "Test", status: "SUCCESS" },
+            { name: "Tests", status: "SUCCESS" },
             { name: "Deploy", status: "SUCCESS" }
           ]
         }
@@ -98,7 +98,7 @@ async function main() {
   await prisma.activity.createMany({
     data: [
       {
-        message: "Pipeline failed: payments-service-prod deploy stage",
+        message: "Pipeline run failed at Deploy",
         entityType: "pipelineRun",
         entityId: failedRun.id,
         createdAt: new Date(Date.now() - 1000 * 60 * 6)

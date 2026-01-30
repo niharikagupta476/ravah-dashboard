@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getPipelines } from "@/lib/pipeline-data";
 import { z } from "zod";
 
 const querySchema = z.object({
@@ -12,9 +12,7 @@ export async function GET(request: Request) {
     status: searchParams.get("status") ?? undefined
   });
 
-  const pipelines = await prisma.pipeline.findMany({
-    orderBy: { lastRunAt: "desc" }
-  });
+  const pipelines = await getPipelines();
 
   const filtered =
     parsed.status && parsed.status !== "all"

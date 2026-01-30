@@ -50,6 +50,8 @@ model Insight {
   riskImpact       String
   relatedChange    String
   createdAt        DateTime @default(now())
+
+  @@index([entityType, entityId])
 }
 
 model Activity {

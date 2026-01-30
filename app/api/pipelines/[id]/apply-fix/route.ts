@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { applyFix } from "@/lib/pipeline-data";
 import { z } from "zod";
 
 const paramsSchema = z.object({
@@ -11,60 +11,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const { id } = paramsSchema.parse(params);
-  const pipeline = await prisma.pipeline.findUnique({
-    where: { id }
-  });
+  const detail = await applyFix(id);
 
-  if (!pipeline) {
+  if (!detail) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
 
-  const startedAt = new Date();
-  const endedAt = new Date(startedAt.getTime() + 1000 * 60 * 6);
-  const durationSec = 360;
-
-  const result = await prisma.$transaction(async (tx) => {
-    const run = await tx.pipelineRun.create({
-      data: {
-        pipelineId: pipeline.id,
-        status: "SUCCESS",
-        startedAt,
-        endedAt,
-        logsText: "Ravah applied fix: updated ECR image tag and redeployed successfully.",
-        stages: {
-          createMany: {
-            data: [
-              { name: "Build", status: "SUCCESS" },
-              { name: "Test", status: "SUCCESS" },
-              { name: "Deploy", status: "SUCCESS" }
-            ]
-          }
-        }
-      }
-    });
-
-    const updatedPipeline = await tx.pipeline.update({
-      where: { id: pipeline.id },
-      data: {
-        status: "SUCCESS",
-        lastRunAt: endedAt,
-        durationSec
-      }
-    });
-
-    await tx.activity.create({
-      data: {
-        message: "Ravah applied fix: Updated ECR image tag",
-        entityType: "pipeline",
-        entityId: pipeline.id
-      }
-    });
-
-    return { run, updatedPipeline };
-  });
-
-  return NextResponse.json({
-    pipelineId: result.updatedPipeline.id,
-    status: result.updatedPipeline.status
-  });
+  return NextResponse.json(detail);
 }

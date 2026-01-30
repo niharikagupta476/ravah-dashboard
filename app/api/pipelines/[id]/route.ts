@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getPipelineDetail } from "@/lib/pipeline-data";
 import { z } from "zod";
 
 const paramsSchema = z.object({
@@ -11,22 +11,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const { id } = paramsSchema.parse(params);
-  const pipeline = await prisma.pipeline.findUnique({
-    where: { id },
-    include: {
-      runs: {
-        orderBy: { startedAt: "desc" },
-        take: 1,
-        include: { stages: true }
-      }
-    }
-  });
+  const detail = await getPipelineDetail(id);
 
-  if (!pipeline) {
+  if (!detail) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
 
-  const run = pipeline.runs[0];
+  const { pipeline, run, insight, activity } = detail;
 
   return NextResponse.json({
     id: pipeline.id,
@@ -37,6 +28,21 @@ export async function GET(
     status: pipeline.status,
     durationSec: pipeline.durationSec,
     lastRunAt: pipeline.lastRunAt,
+    activity: activity.map((entry) => ({
+      id: entry.id,
+      message: entry.message,
+      createdAt: entry.createdAt
+    })),
+    insight: insight
+      ? {
+          id: insight.id,
+          rootCause: insight.rootCause,
+          confidence: insight.confidence,
+          suggestedFix: JSON.parse(insight.suggestedFixJson) as string[],
+          riskImpact: insight.riskImpact,
+          relatedChange: insight.relatedChange
+        }
+      : null,
     run: run
       ? {
           id: run.id,

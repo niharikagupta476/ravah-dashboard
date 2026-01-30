@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { analyzeLogs } from "@/lib/insights";
+import { getOrCreateInsightForRun } from "@/lib/pipeline-data";
 import { z } from "zod";
 
 const querySchema = z.object({
@@ -23,26 +23,7 @@ export async function GET(request: Request) {
   });
 
   if (!insight && parsed.entityType === "pipelineRun") {
-    const run = await prisma.pipelineRun.findUnique({
-      where: { id: parsed.entityId }
-    });
-
-    if (run) {
-      const generated = analyzeLogs(run.logsText);
-      if (generated) {
-        insight = await prisma.insight.create({
-          data: {
-            entityType: "pipelineRun",
-            entityId: run.id,
-            rootCause: generated.rootCause,
-            confidence: generated.confidence,
-            suggestedFixJson: JSON.stringify(generated.suggestedFix),
-            riskImpact: generated.riskImpact,
-            relatedChange: generated.relatedChange
-          }
-        });
-      }
-    }
+    insight = await getOrCreateInsightForRun(parsed.entityId);
   }
 
   if (!insight) {

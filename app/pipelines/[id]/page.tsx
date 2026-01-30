@@ -17,12 +17,6 @@ async function fetchPipeline(id: string) {
   return response.json();
 }
 
-async function fetchInsight(entityId: string) {
-  const response = await fetch(`/api/insights?entityType=pipelineRun&entityId=${entityId}`);
-  if (!response.ok) throw new Error("Failed to load insight");
-  return response.json();
-}
-
 async function applyFix(id: string) {
   const response = await fetch(`/api/pipelines/${id}/apply-fix`, { method: "POST" });
   if (!response.ok) throw new Error("Failed to apply fix");
@@ -35,11 +29,6 @@ export default function PipelineDetailPage() {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["pipeline", id], queryFn: () => fetchPipeline(id) });
   const runId = data?.run?.id as string | undefined;
-  const { data: insight } = useQuery({
-    queryKey: ["insight", runId],
-    queryFn: () => fetchInsight(runId!),
-    enabled: !!runId
-  });
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -52,7 +41,7 @@ export default function PipelineDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["pipeline", id] });
       queryClient.invalidateQueries({ queryKey: ["pipelines"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setToast("Pipeline run marked successful.");
+      setToast("Fix applied.");
       setConfirmOpen(false);
       setDrawerOpen(false);
       setTimeout(() => setToast(null), 3000);
@@ -61,13 +50,13 @@ export default function PipelineDetailPage() {
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
-      if (event.key === "i" && insight && data?.status?.toLowerCase() === "failed") {
+      if (event.key === "i" && data?.insight && data?.status?.toLowerCase() === "failed") {
         setDrawerOpen(true);
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [insight, data?.status]);
+  }, [data?.insight, data?.status]);
 
   const stages = useMemo(() => {
     return (
@@ -78,13 +67,13 @@ export default function PipelineDetailPage() {
     );
   }, [data]);
 
-  const insightData: InsightData | null = insight
+  const insightData: InsightData | null = data?.insight
     ? {
-        rootCause: insight.rootCause,
-        confidence: insight.confidence,
-        suggestedFix: insight.suggestedFix,
-        riskImpact: insight.riskImpact,
-        relatedChange: insight.relatedChange
+        rootCause: data.insight.rootCause,
+        confidence: data.insight.confidence,
+        suggestedFix: data.insight.suggestedFix,
+        riskImpact: data.insight.riskImpact,
+        relatedChange: data.insight.relatedChange
       }
     : null;
 
@@ -160,6 +149,24 @@ export default function PipelineDetailPage() {
           </Button>
         </div>
       </Modal>
+
+      <Card className="p-5">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Recent activity</h3>
+        <ul className="mt-3 space-y-2 text-sm text-slate-500 dark:text-slate-300">
+          {data.activity?.length ? (
+            data.activity.map((entry: { id: string; message: string; createdAt: string }) => (
+              <li key={entry.id} className="flex items-center justify-between">
+                <span>{entry.message}</span>
+                <span className="text-xs text-slate-400">
+                  {new Date(entry.createdAt).toLocaleTimeString()}
+                </span>
+              </li>
+            ))
+          ) : (
+            <li className="text-slate-400">No activity recorded.</li>
+          )}
+        </ul>
+      </Card>
 
       {toast && (
         <div className="fixed bottom-6 right-6 rounded-md bg-slate-900 px-4 py-2 text-sm text-white shadow-lg">
