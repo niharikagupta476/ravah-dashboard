@@ -7,7 +7,7 @@ test("dashboard to pipeline apply fix", async ({ page }) => {
   await page.goto("/pipelines");
   await expect(page.getByText("Pipelines")).toBeVisible();
 
-  await page.getByRole("link", { name: "Payments API" }).click();
+  await page.getByRole("link", { name: "payments-service-prod" }).click();
 
   await expect(page.getByText("Stage flow")).toBeVisible();
 

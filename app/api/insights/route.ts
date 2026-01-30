@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { analyzeLogs } from "@/lib/insights";
 import { z } from "zod";
 
 const querySchema = z.object({
@@ -14,12 +15,35 @@ export async function GET(request: Request) {
     entityId: searchParams.get("entityId")
   });
 
-  const insight = await prisma.insight.findFirst({
+  let insight = await prisma.insight.findFirst({
     where: {
       entityType: parsed.entityType,
       entityId: parsed.entityId
     }
   });
+
+  if (!insight && parsed.entityType === "pipelineRun") {
+    const run = await prisma.pipelineRun.findUnique({
+      where: { id: parsed.entityId }
+    });
+
+    if (run) {
+      const generated = analyzeLogs(run.logsText);
+      if (generated) {
+        insight = await prisma.insight.create({
+          data: {
+            entityType: "pipelineRun",
+            entityId: run.id,
+            rootCause: generated.rootCause,
+            confidence: generated.confidence,
+            suggestedFixJson: JSON.stringify(generated.suggestedFix),
+            riskImpact: generated.riskImpact,
+            relatedChange: generated.relatedChange
+          }
+        });
+      }
+    }
+  }
 
   if (!insight) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
@@ -29,9 +53,10 @@ export async function GET(request: Request) {
     id: insight.id,
     entityType: insight.entityType,
     entityId: insight.entityId,
-    rootCause: JSON.parse(insight.rootCauseJson) as string[],
+    rootCause: insight.rootCause,
     confidence: insight.confidence,
     suggestedFix: JSON.parse(insight.suggestedFixJson) as string[],
-    riskImpact: insight.riskImpact
+    riskImpact: insight.riskImpact,
+    relatedChange: insight.relatedChange
   });
 }

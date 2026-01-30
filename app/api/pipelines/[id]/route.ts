@@ -31,24 +31,25 @@ export async function GET(
   return NextResponse.json({
     id: pipeline.id,
     name: pipeline.name,
+    service: pipeline.service,
     owner: pipeline.owner,
     env: pipeline.env,
-    lastRunStatus: pipeline.lastRunStatus,
-    lastRunDurationSec: pipeline.lastRunDurationSec,
-    updatedAt: pipeline.updatedAt,
+    status: pipeline.status,
+    durationSec: pipeline.durationSec,
+    lastRunAt: pipeline.lastRunAt,
     run: run
       ? {
           id: run.id,
           startedAt: run.startedAt,
           endedAt: run.endedAt,
           status: run.status,
-          durationSec: run.durationSec,
+          logsText: run.logsText,
           stages: run.stages.map((stage) => ({
             id: stage.id,
             name: stage.name,
             status: stage.status,
             errorCode: stage.errorCode,
-            errorSummary: stage.errorSummary
+            errorMessage: stage.errorMessage
           }))
         }
       : null

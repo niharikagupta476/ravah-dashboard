@@ -12,43 +12,59 @@ export async function POST(
 ) {
   const { id } = paramsSchema.parse(params);
   const pipeline = await prisma.pipeline.findUnique({
-    where: { id },
-    include: {
-      runs: {
-        orderBy: { startedAt: "desc" },
-        take: 1,
-        include: { stages: true }
-      }
-    }
+    where: { id }
   });
 
-  if (!pipeline || pipeline.runs.length === 0) {
+  if (!pipeline) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
 
-  const run = pipeline.runs[0];
+  const startedAt = new Date();
+  const endedAt = new Date(startedAt.getTime() + 1000 * 60 * 6);
+  const durationSec = 360;
 
-  await prisma.pipelineStage.updateMany({
-    where: { pipelineRunId: run.id },
-    data: { status: "success", errorCode: null, errorSummary: null }
-  });
+  const result = await prisma.$transaction(async (tx) => {
+    const run = await tx.pipelineRun.create({
+      data: {
+        pipelineId: pipeline.id,
+        status: "SUCCESS",
+        startedAt,
+        endedAt,
+        logsText: "Ravah applied fix: updated ECR image tag and redeployed successfully.",
+        stages: {
+          createMany: {
+            data: [
+              { name: "Build", status: "SUCCESS" },
+              { name: "Test", status: "SUCCESS" },
+              { name: "Deploy", status: "SUCCESS" }
+            ]
+          }
+        }
+      }
+    });
 
-  await prisma.pipelineRun.update({
-    where: { id: run.id },
-    data: {
-      status: "success",
-      endedAt: new Date(),
-      durationSec: run.durationSec
-    }
-  });
+    const updatedPipeline = await tx.pipeline.update({
+      where: { id: pipeline.id },
+      data: {
+        status: "SUCCESS",
+        lastRunAt: endedAt,
+        durationSec
+      }
+    });
 
-  const updated = await prisma.pipeline.update({
-    where: { id },
-    data: { lastRunStatus: "success", lastRunDurationSec: run.durationSec }
+    await tx.activity.create({
+      data: {
+        message: "Ravah applied fix: Updated ECR image tag",
+        entityType: "pipeline",
+        entityId: pipeline.id
+      }
+    });
+
+    return { run, updatedPipeline };
   });
 
   return NextResponse.json({
-    pipelineId: updated.id,
-    status: updated.lastRunStatus
+    pipelineId: result.updatedPipeline.id,
+    status: result.updatedPipeline.status
   });
 }

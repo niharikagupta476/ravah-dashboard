@@ -14,13 +14,13 @@ Create a local SQLite database (default) and run migrations:
 
 ```bash
 export DATABASE_URL="file:./dev.db"
-npm run prisma:migrate
+npx prisma migrate dev
 ```
 
 ## Seed data
 
 ```bash
-npm run prisma:seed
+npx prisma db seed
 ```
 
 ## Run the app
@@ -36,7 +36,7 @@ npm run dev
 3. Run migrations again:
 
 ```bash
-npm run prisma:migrate
+npx prisma migrate dev
 ```
 
 ## Tests

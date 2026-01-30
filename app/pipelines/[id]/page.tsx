@@ -51,6 +51,7 @@ export default function PipelineDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pipeline", id] });
       queryClient.invalidateQueries({ queryKey: ["pipelines"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setToast("Pipeline run marked successful.");
       setConfirmOpen(false);
       setDrawerOpen(false);
@@ -60,19 +61,19 @@ export default function PipelineDetailPage() {
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
-      if (event.key === "i" && insight) {
+      if (event.key === "i" && insight && data?.status?.toLowerCase() === "failed") {
         setDrawerOpen(true);
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [insight]);
+  }, [insight, data?.status]);
 
   const stages = useMemo(() => {
     return (
       data?.run?.stages?.map((stage: { name: string; status: string }) => ({
         name: stage.name,
-        status: stage.status === "success" ? "success" : stage.status === "failed" ? "failed" : "pending"
+        status: stage.status.toLowerCase() === "success" ? "success" : stage.status.toLowerCase() === "failed" ? "failed" : "pending"
       })) ?? []
     );
   }, [data]);
@@ -82,7 +83,8 @@ export default function PipelineDetailPage() {
         rootCause: insight.rootCause,
         confidence: insight.confidence,
         suggestedFix: insight.suggestedFix,
-        riskImpact: insight.riskImpact
+        riskImpact: insight.riskImpact,
+        relatedChange: insight.relatedChange
       }
     : null;
 
@@ -90,16 +92,18 @@ export default function PipelineDetailPage() {
     return <div className="container-page">Loading pipeline...</div>;
   }
 
+  const isFailed = data.status.toLowerCase() === "failed";
+
   return (
     <div className="container-page space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">{data.name}</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
-            {data.env} · Duration {Math.round(data.lastRunDurationSec / 60)} min
+            {data.env} · Duration {Math.round(data.durationSec / 60)} min
           </p>
         </div>
-        <StatusChip status={data.lastRunStatus} label={data.lastRunStatus} />
+        <StatusChip status={data.status} label={data.status} />
       </div>
 
       <Card className="p-5">
@@ -109,7 +113,7 @@ export default function PipelineDetailPage() {
         </div>
       </Card>
 
-      {insightData && (
+      {insightData && isFailed && (
         <InsightInlineCard
           onViewInsight={() => setDrawerOpen(true)}
           onViewLogs={() => setLogOpen(true)}
@@ -121,7 +125,7 @@ export default function PipelineDetailPage() {
         onClose={() => setDrawerOpen(false)}
         data={
           insightData ?? {
-            rootCause: [],
+            rootCause: "",
             confidence: "Low",
             suggestedFix: [],
             riskImpact: "Low"
@@ -129,8 +133,7 @@ export default function PipelineDetailPage() {
         }
         mode="pipeline"
         onApplyFix={() => setConfirmOpen(true)}
-        onCreatePr={() => setToast("PR created and queued for review.")}
-        onEscalate={() => setToast("Incident escalation created.")}
+        onViewLogs={() => setLogOpen(true)}
       />
 
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
@@ -149,7 +152,7 @@ export default function PipelineDetailPage() {
       <Modal open={logOpen} onClose={() => setLogOpen(false)}>
         <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Pipeline logs</h3>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-300">
-          Sample excerpt: error ImagePullBackOff pulling payments-api:release-482.
+          {data.run?.logsText ?? "Logs unavailable."}
         </p>
         <div className="mt-4 flex justify-end">
           <Button variant="secondary" onClick={() => setLogOpen(false)}>

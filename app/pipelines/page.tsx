@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 type Pipeline = {
   id: string;
   name: string;
+  service: string;
   owner: string;
   env: string;
-  lastRunStatus: string;
-  lastRunDurationSec: number;
-  updatedAt: string;
+  status: string;
+  durationSec: number;
+  lastRunAt: string;
 };
 
 async function fetchPipelines(status: string): Promise<Pipeline[]> {
@@ -69,16 +70,14 @@ export default function PipelinesPage() {
                   <Link href={`/pipelines/${pipeline.id}`} className="font-medium text-slate-900 dark:text-white">
                     {pipeline.name}
                   </Link>
-                  <p className="text-xs text-slate-400">
-                    Updated {new Date(pipeline.updatedAt).toLocaleString()}
-                  </p>
+                  <p className="text-xs text-slate-400">Service {pipeline.service}</p>
                 </td>
                 <td className="px-4 py-3 text-slate-500 dark:text-slate-300">{pipeline.env}</td>
                 <td className="px-4 py-3">
-                  <StatusChip status={pipeline.lastRunStatus} label={pipeline.lastRunStatus} />
+                  <StatusChip status={pipeline.status} label={pipeline.status} />
                 </td>
                 <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
-                  {Math.round(pipeline.lastRunDurationSec / 60)} min
+                  {Math.round(pipeline.durationSec / 60)} min
                 </td>
                 <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
                   {pipeline.owner}

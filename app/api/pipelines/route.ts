@@ -13,23 +13,24 @@ export async function GET(request: Request) {
   });
 
   const pipelines = await prisma.pipeline.findMany({
-    orderBy: { updatedAt: "desc" }
+    orderBy: { lastRunAt: "desc" }
   });
 
   const filtered =
     parsed.status && parsed.status !== "all"
-      ? pipelines.filter((pipeline) => pipeline.lastRunStatus === parsed.status)
+      ? pipelines.filter((pipeline) => pipeline.status.toLowerCase() === parsed.status)
       : pipelines;
 
   return NextResponse.json(
     filtered.map((pipeline) => ({
       id: pipeline.id,
       name: pipeline.name,
+      service: pipeline.service,
       owner: pipeline.owner,
       env: pipeline.env,
-      lastRunStatus: pipeline.lastRunStatus,
-      lastRunDurationSec: pipeline.lastRunDurationSec,
-      updatedAt: pipeline.updatedAt
+      status: pipeline.status,
+      durationSec: pipeline.durationSec,
+      lastRunAt: pipeline.lastRunAt
     }))
   );
 }

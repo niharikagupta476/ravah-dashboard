@@ -8,38 +8,58 @@ datasource db {
 }
 
 model Pipeline {
-  id                   String        @id @default(cuid())
-  name                 String
-  owner                String
-  env                  String
-  lastRunStatus        String
-  lastRunDurationSec   Int
-  updatedAt            DateTime      @updatedAt
-  runs                 PipelineRun[]
+  id          String        @id @default(cuid())
+  name        String
+  service     String
+  env         String
+  status      String
+  lastRunAt   DateTime
+  durationSec Int
+  owner       String
+  runs        PipelineRun[]
 }
 
 model PipelineRun {
-  id           String          @id @default(cuid())
-  pipelineId   String
-  startedAt    DateTime
-  endedAt      DateTime?
-  status       String
-  durationSec  Int
-  pipeline     Pipeline        @relation(fields: [pipelineId], references: [id])
-  stages       PipelineStage[]
-  insights     Insight[]       @relation("PipelineRunInsights")
+  id         String   @id @default(cuid())
+  pipelineId String
+  status     String
+  startedAt  DateTime
+  endedAt    DateTime?
+  logsText   String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+  stages     Stage[]
+  insights   Insight[] @relation("PipelineRunInsights")
 }
 
-model PipelineStage {
-  id            String        @id @default(cuid())
+model Stage {
+  id            String      @id @default(cuid())
   pipelineRunId String
   name          String
   status        String
-  startedAt     DateTime
-  endedAt       DateTime?
   errorCode     String?
-  errorSummary  String?
-  run           PipelineRun   @relation(fields: [pipelineRunId], references: [id])
+  errorMessage  String?
+  run           PipelineRun @relation(fields: [pipelineRunId], references: [id])
+}
+
+model Insight {
+  id               String   @id @default(cuid())
+  entityType       String
+  entityId         String
+  rootCause        String
+  confidence       String
+  suggestedFixJson String
+  riskImpact       String
+  relatedChange    String
+  createdAt        DateTime @default(now())
+  pipelineRun      PipelineRun? @relation("PipelineRunInsights", fields: [entityId], references: [id], map: "pipeline_run_fk")
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  message    String
+  createdAt  DateTime @default(now())
+  entityType String
+  entityId   String
 }
 
 model AlertGroup {
@@ -52,7 +72,6 @@ model AlertGroup {
   lastSeenAt DateTime
   status     String
   instances  AlertInstance[]
-  insights   Insight[]       @relation("AlertGroupInsights")
 }
 
 model AlertInstance {
@@ -74,7 +93,6 @@ model Incident {
   resolvedAt DateTime?
   owner      String
   events     IncidentEvent[]
-  insights   Insight[]       @relation("IncidentInsights")
 }
 
 model IncidentEvent {
@@ -84,18 +102,4 @@ model IncidentEvent {
   type       String
   message    String
   incident   Incident @relation(fields: [incidentId], references: [id])
-}
-
-model Insight {
-  id              String   @id @default(cuid())
-  entityType      String
-  entityId        String
-  rootCauseJson   String
-  confidence      String
-  suggestedFixJson String
-  riskImpact      String
-  createdAt       DateTime @default(now())
-  pipelineRun     PipelineRun? @relation("PipelineRunInsights", fields: [entityId], references: [id], map: "pipeline_run_fk")
-  alertGroup      AlertGroup?  @relation("AlertGroupInsights", fields: [entityId], references: [id], map: "alert_group_fk")
-  incident        Incident?    @relation("IncidentInsights", fields: [entityId], references: [id], map: "incident_fk")
 }
