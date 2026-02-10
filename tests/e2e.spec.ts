@@ -14,7 +14,7 @@ test("dashboard to pipeline apply fix", async ({ page }) => {
   await page.getByRole("button", { name: "View insight" }).click();
   await expect(page.getByText("System Insight")).toBeVisible();
 
-  await page.getByRole("button", { name: "Apply Fix" }).click();
+  await page.getByRole("button", { name: "Apply Fix (Simulated)" }).click();
   await page.getByRole("button", { name: "Confirm" }).click();
 
   await expect(page.getByText("Fix applied.")).toBeVisible();

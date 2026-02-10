@@ -123,6 +123,7 @@ export default function PipelineDetailPage() {
         mode="pipeline"
         onApplyFix={() => setConfirmOpen(true)}
         onViewLogs={() => setLogOpen(true)}
+        applyFixLabel="Apply Fix (Simulated)"
       />
 
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>

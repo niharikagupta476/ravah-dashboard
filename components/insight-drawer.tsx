@@ -22,7 +22,8 @@ export function InsightDrawer({
   onApplyFix,
   onCreatePr,
   onEscalate,
-  onViewLogs
+  onViewLogs,
+  applyFixLabel
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,6 +33,7 @@ export function InsightDrawer({
   onCreatePr?: () => void;
   onEscalate?: () => void;
   onViewLogs?: () => void;
+  applyFixLabel?: string;
 }) {
   const primaryRootCause = data.rootCause;
   const contributing = data.suggestedFix.slice(0, 2);
@@ -138,7 +140,7 @@ export function InsightDrawer({
             </div>
           </Card>
           <div className="flex flex-col gap-3">
-            {onApplyFix && <Button onClick={onApplyFix}>Apply Fix</Button>}
+            {onApplyFix && <Button onClick={onApplyFix}>{applyFixLabel ?? "Apply Fix"}</Button>}
             {onViewLogs && (
               <Button variant="secondary" onClick={onViewLogs}>
                 View Logs

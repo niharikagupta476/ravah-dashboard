@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getRequestContext } from "@/lib/context";
 import { z } from "zod";
 
 export async function GET() {
+  const context = await getRequestContext();
+  if (!context) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const [pipelines, alerts, incidents, activities] = await Promise.all([
-    prisma.pipeline.findMany(),
+    prisma.pipeline.findMany({ where: { orgId: context.orgId, projectId: context.projectId } }),
     prisma.alertGroup.findMany(),
     prisma.incident.findMany(),
     prisma.activity.findMany({
+      where: { orgId: context.orgId, projectId: context.projectId },
       orderBy: { createdAt: "desc" },
       take: 5
     })

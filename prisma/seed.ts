@@ -11,8 +11,26 @@ async function main() {
   await prisma.incidentEvent.deleteMany();
   await prisma.incident.deleteMany();
 
+  const demoOrg = await prisma.organization.create({
+    data: {
+      name: "Demo Org",
+      slug: "demo"
+    }
+  });
+
+  const demoProject = await prisma.project.create({
+    data: {
+      orgId: demoOrg.id,
+      name: "Demo Project",
+      repoOwner: "demo",
+      repoName: "ravah-demo"
+    }
+  });
+
   const paymentsPipeline = await prisma.pipeline.create({
     data: {
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
       name: "payments-service-prod",
       service: "payments-service",
       env: "Prod",
@@ -25,6 +43,8 @@ async function main() {
 
   const userPipeline = await prisma.pipeline.create({
     data: {
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
       name: "user-service-prod",
       service: "user-service",
       env: "Prod",
@@ -38,6 +58,8 @@ async function main() {
   const failedRun = await prisma.pipelineRun.create({
     data: {
       pipelineId: paymentsPipeline.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
       status: "FAILED",
       startedAt: new Date(Date.now() - 1000 * 60 * 20),
       endedAt: new Date(Date.now() - 1000 * 60 * 7),
@@ -46,11 +68,13 @@ async function main() {
       stages: {
         createMany: {
           data: [
-            { name: "Build", status: "SUCCESS" },
-            { name: "Tests", status: "SUCCESS" },
+            { name: "Build", status: "SUCCESS", orgId: demoOrg.id, projectId: demoProject.id },
+            { name: "Tests", status: "SUCCESS", orgId: demoOrg.id, projectId: demoProject.id },
             {
               name: "Deploy",
               status: "FAILED",
+              orgId: demoOrg.id,
+              projectId: demoProject.id,
               errorCode: "ImagePullBackOff",
               errorMessage: "Image tag not found in registry (ECR)"
             }
@@ -63,6 +87,8 @@ async function main() {
   await prisma.pipelineRun.create({
     data: {
       pipelineId: userPipeline.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
       status: "SUCCESS",
       startedAt: new Date(Date.now() - 1000 * 60 * 50),
       endedAt: new Date(Date.now() - 1000 * 60 * 42),
@@ -70,9 +96,9 @@ async function main() {
       stages: {
         createMany: {
           data: [
-            { name: "Build", status: "SUCCESS" },
-            { name: "Tests", status: "SUCCESS" },
-            { name: "Deploy", status: "SUCCESS" }
+            { name: "Build", status: "SUCCESS", orgId: demoOrg.id, projectId: demoProject.id },
+            { name: "Tests", status: "SUCCESS", orgId: demoOrg.id, projectId: demoProject.id },
+            { name: "Deploy", status: "SUCCESS", orgId: demoOrg.id, projectId: demoProject.id }
           ]
         }
       }
@@ -83,6 +109,8 @@ async function main() {
     data: {
       entityType: "pipelineRun",
       entityId: failedRun.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
       rootCause: "Image tag not found in registry (ECR)",
       confidence: "High",
       suggestedFixJson: JSON.stringify([
@@ -101,12 +129,16 @@ async function main() {
         message: "Pipeline run failed at Deploy",
         entityType: "pipelineRun",
         entityId: failedRun.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
         createdAt: new Date(Date.now() - 1000 * 60 * 6)
       },
       {
         message: "Pipeline succeeded: user-service-prod",
         entityType: "pipeline",
         entityId: userPipeline.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
         createdAt: new Date(Date.now() - 1000 * 60 * 40)
       }
     ]
@@ -139,6 +171,8 @@ async function main() {
     data: {
       entityType: "alertGroup",
       entityId: alertGroup.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
       rootCause: "Traffic spike from partner batch window",
       confidence: "Med",
       suggestedFixJson: JSON.stringify([
@@ -177,6 +211,8 @@ async function main() {
     data: {
       entityType: "incident",
       entityId: incident.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
       rootCause: "Primary database connection pool exhausted during peak checkout",
       confidence: "High",
       suggestedFixJson: JSON.stringify([

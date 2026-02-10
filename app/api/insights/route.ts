@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateInsightForRun } from "@/lib/pipeline-data";
+import { getRequestContext } from "@/lib/context";
 import { z } from "zod";
 
 const querySchema = z.object({
@@ -15,15 +16,22 @@ export async function GET(request: Request) {
     entityId: searchParams.get("entityId")
   });
 
+  const context = await getRequestContext();
+  if (!context) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   let insight = await prisma.insight.findFirst({
     where: {
       entityType: parsed.entityType,
-      entityId: parsed.entityId
+      entityId: parsed.entityId,
+      orgId: context.orgId,
+      projectId: context.projectId
     }
   });
 
   if (!insight && parsed.entityType === "pipelineRun") {
-    insight = await getOrCreateInsightForRun(parsed.entityId);
+    insight = await getOrCreateInsightForRun(parsed.entityId, context.orgId, context.projectId);
   }
 
   if (!insight) {

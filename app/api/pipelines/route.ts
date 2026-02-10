@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPipelines } from "@/lib/pipeline-data";
+import { getRequestContext } from "@/lib/context";
 import { z } from "zod";
 
 const querySchema = z.object({
@@ -12,7 +13,12 @@ export async function GET(request: Request) {
     status: searchParams.get("status") ?? undefined
   });
 
-  const pipelines = await getPipelines();
+  const context = await getRequestContext();
+  if (!context) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const pipelines = await getPipelines(context.orgId, context.projectId);
 
   const filtered =
     parsed.status && parsed.status !== "all"

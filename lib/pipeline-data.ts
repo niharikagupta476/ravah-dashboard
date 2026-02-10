@@ -1,15 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { analyzeLogs } from "@/lib/analyze-logs";
 
-export async function getPipelines() {
+export async function getPipelines(orgId: string, projectId: string) {
   return prisma.pipeline.findMany({
+    where: { orgId, projectId },
     orderBy: { lastRunAt: "desc" }
   });
 }
 
-export async function getOrCreateInsightForRun(runId: string) {
+export async function getOrCreateInsightForRun(runId: string, orgId: string, projectId: string) {
   const existing = await prisma.insight.findFirst({
-    where: { entityType: "pipelineRun", entityId: runId }
+    where: { entityType: "pipelineRun", entityId: runId, orgId, projectId }
   });
 
   if (existing) return existing;
@@ -26,6 +27,8 @@ export async function getOrCreateInsightForRun(runId: string) {
     data: {
       entityType: "pipelineRun",
       entityId: run.id,
+      orgId,
+      projectId,
       rootCause: generated.rootCause,
       confidence: generated.confidence,
       suggestedFixJson: JSON.stringify(generated.suggestedFix),
@@ -35,9 +38,9 @@ export async function getOrCreateInsightForRun(runId: string) {
   });
 }
 
-export async function getPipelineDetail(pipelineId: string) {
+export async function getPipelineDetail(pipelineId: string, orgId: string, projectId: string) {
   const pipeline = await prisma.pipeline.findUnique({
-    where: { id: pipelineId },
+    where: { id: pipelineId, orgId, projectId },
     include: {
       runs: {
         orderBy: { startedAt: "desc" },
@@ -50,9 +53,16 @@ export async function getPipelineDetail(pipelineId: string) {
   if (!pipeline) return null;
 
   const run = pipeline.runs[0];
-  const insight = run ? await getOrCreateInsightForRun(run.id) : null;
+  const insight = run ? await getOrCreateInsightForRun(run.id, orgId, projectId) : null;
   const activity = await prisma.activity.findMany({
-    where: { entityType: "pipeline", entityId: pipeline.id },
+    where: {
+      orgId,
+      projectId,
+      OR: [
+        { entityType: "pipeline", entityId: pipeline.id },
+        ...(run ? [{ entityType: "pipelineRun", entityId: run.id }] : [])
+      ]
+    },
     orderBy: { createdAt: "desc" },
     take: 5
   });
@@ -60,8 +70,8 @@ export async function getPipelineDetail(pipelineId: string) {
   return { pipeline, run, insight, activity };
 }
 
-export async function applyFix(pipelineId: string) {
-  const pipeline = await prisma.pipeline.findUnique({ where: { id: pipelineId } });
+export async function applyFix(pipelineId: string, orgId: string, projectId: string) {
+  const pipeline = await prisma.pipeline.findUnique({ where: { id: pipelineId, orgId, projectId } });
 
   if (!pipeline) return null;
 
@@ -73,6 +83,8 @@ export async function applyFix(pipelineId: string) {
     await tx.pipelineRun.create({
       data: {
         pipelineId: pipeline.id,
+        orgId,
+        projectId,
         status: "SUCCESS",
         startedAt,
         endedAt,
@@ -80,9 +92,9 @@ export async function applyFix(pipelineId: string) {
         stages: {
           createMany: {
             data: [
-              { name: "Build", status: "SUCCESS" },
-              { name: "Tests", status: "SUCCESS" },
-              { name: "Deploy", status: "SUCCESS" }
+              { name: "Build", status: "SUCCESS", orgId, projectId },
+              { name: "Tests", status: "SUCCESS", orgId, projectId },
+              { name: "Deploy", status: "SUCCESS", orgId, projectId }
             ]
           }
         }
@@ -100,12 +112,14 @@ export async function applyFix(pipelineId: string) {
 
     await tx.activity.create({
       data: {
-        message: "Ravah applied fix: Updated ECR image tag",
+        message: "Fix applied (simulated): Updated ECR image tag",
         entityType: "pipeline",
-        entityId: pipeline.id
+        entityId: pipeline.id,
+        orgId,
+        projectId
       }
     });
   });
 
-  return getPipelineDetail(pipelineId);
+  return getPipelineDetail(pipelineId, orgId, projectId);
 }

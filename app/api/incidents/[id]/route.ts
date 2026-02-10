@@ -10,7 +10,12 @@ export async function GET(
   _request: Request,
   { params }: { params: { id: string } }
 ) {
-  const { id } = paramsSchema.parse(params);
+  const parsedParams = paramsSchema.safeParse(params);
+  if (!parsedParams.success) {
+    return NextResponse.json({ message: "Invalid incident id" }, { status: 400 });
+  }
+
+  const { id } = parsedParams.data;
   const incident = await prisma.incident.findUnique({
     where: { id },
     include: { events: { orderBy: { timestamp: "desc" } } }

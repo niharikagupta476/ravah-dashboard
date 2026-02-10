@@ -2,6 +2,17 @@
 
 Production-ready MVP DevOps control plane UI built with Next.js 14, Prisma, and Tailwind.
 
+## Environment variables
+
+```bash
+DATABASE_URL="file:./dev.db"
+NEXTAUTH_SECRET="replace-with-random-secret"
+GITHUB_CLIENT_ID="github-oauth-client-id"
+GITHUB_CLIENT_SECRET="github-oauth-client-secret"
+GITHUB_WEBHOOK_SECRET="webhook-secret"
+DEMO_MODE="true"
+```
+
 ## Install
 
 ```bash
@@ -38,6 +49,23 @@ npm run dev
 ```bash
 npx prisma migrate dev
 ```
+
+## GitHub OAuth setup
+
+1. Create a GitHub OAuth App and set the callback URL to `http://localhost:3000/api/auth/callback/github`.
+2. Add `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `NEXTAUTH_SECRET` to your env.
+
+## GitHub webhook setup (GitHub App)
+
+1. Configure your GitHub App webhook to `http://localhost:3000/api/webhooks/github`.
+2. Set the webhook secret and add `GITHUB_WEBHOOK_SECRET` to your env.
+3. Install the app on a repository; map the installation ID to an org/project via `IntegrationGithub`.
+
+## Test ingestion
+
+1. Run the dev server.
+2. Trigger a failed GitHub Action in the connected repo.
+3. Visit `/pipelines` and verify the run appears and the System Insight drawer opens.
 
 ## Tests
 
