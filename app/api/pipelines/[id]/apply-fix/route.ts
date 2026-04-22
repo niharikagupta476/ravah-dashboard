@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { applyFix } from "@/lib/pipeline-data";
+import { getRequestContext } from "@/lib/context";
 import { z } from "zod";
 
 const paramsSchema = z.object({
@@ -10,45 +11,22 @@ export async function POST(
   _request: Request,
   { params }: { params: { id: string } }
 ) {
-  const { id } = paramsSchema.parse(params);
-  const pipeline = await prisma.pipeline.findUnique({
-    where: { id },
-    include: {
-      runs: {
-        orderBy: { startedAt: "desc" },
-        take: 1,
-        include: { stages: true }
-      }
-    }
-  });
+  const parsedParams = paramsSchema.safeParse(params);
+  if (!parsedParams.success) {
+    return NextResponse.json({ message: "Invalid id" }, { status: 400 });
+  }
 
-  if (!pipeline || pipeline.runs.length === 0) {
+  const { id } = parsedParams.data;
+  const context = await getRequestContext();
+  if (!context) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const detail = await applyFix(id, context.orgId, context.projectId);
+
+  if (!detail) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
 
-  const run = pipeline.runs[0];
-
-  await prisma.pipelineStage.updateMany({
-    where: { pipelineRunId: run.id },
-    data: { status: "success", errorCode: null, errorSummary: null }
-  });
-
-  await prisma.pipelineRun.update({
-    where: { id: run.id },
-    data: {
-      status: "success",
-      endedAt: new Date(),
-      durationSec: run.durationSec
-    }
-  });
-
-  const updated = await prisma.pipeline.update({
-    where: { id },
-    data: { lastRunStatus: "success", lastRunDurationSec: run.durationSec }
-  });
-
-  return NextResponse.json({
-    pipelineId: updated.id,
-    status: updated.lastRunStatus
-  });
+  return NextResponse.json(detail);
 }

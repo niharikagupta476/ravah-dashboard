@@ -7,10 +7,11 @@ import { cn } from "@/lib/utils";
 export type InsightMode = "pipeline" | "alert" | "incident";
 
 export type InsightData = {
-  rootCause: string[];
+  rootCause: string;
   confidence: "High" | "Med" | "Low";
   suggestedFix: string[];
   riskImpact: "Low" | "Med" | "High";
+  relatedChange?: string;
 };
 
 export function InsightDrawer({
@@ -20,7 +21,9 @@ export function InsightDrawer({
   mode,
   onApplyFix,
   onCreatePr,
-  onEscalate
+  onEscalate,
+  onViewLogs,
+  applyFixLabel
 }: {
   open: boolean;
   onClose: () => void;
@@ -29,10 +32,12 @@ export function InsightDrawer({
   onApplyFix?: () => void;
   onCreatePr?: () => void;
   onEscalate?: () => void;
+  onViewLogs?: () => void;
+  applyFixLabel?: string;
 }) {
-  const primaryRootCause = data.rootCause[0] ?? "";
-  const contributing = data.rootCause.slice(1);
-  const executiveSummary = [...data.rootCause.slice(0, 2), ...data.suggestedFix.slice(0, 3)].slice(0, 5);
+  const primaryRootCause = data.rootCause;
+  const contributing = data.suggestedFix.slice(0, 2);
+  const executiveSummary = [data.rootCause, ...data.suggestedFix].slice(0, 5);
 
   return (
     <div
@@ -64,11 +69,7 @@ export function InsightDrawer({
           {mode !== "incident" && (
             <Card className="p-4">
               <h3 className="text-sm font-semibold">Root cause</h3>
-              <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-600 dark:text-slate-300">
-                {data.rootCause.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{data.rootCause}</p>
             </Card>
           )}
 
@@ -117,14 +118,18 @@ export function InsightDrawer({
           {mode !== "incident" && (
             <Card className="p-4">
               <h3 className="text-sm font-semibold">Suggested fix</h3>
-              <div className="mt-2 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-600 dark:text-slate-300">
                 {data.suggestedFix.map((item) => (
-                  <label key={item} className="flex items-center gap-2">
-                    <input type="checkbox" defaultChecked className="accent-accent" />
-                    {item}
-                  </label>
+                  <li key={item}>{item}</li>
                 ))}
-              </div>
+              </ul>
+            </Card>
+          )}
+
+          {mode !== "incident" && data.relatedChange && (
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold">Related change</h3>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{data.relatedChange}</p>
             </Card>
           )}
 
@@ -135,7 +140,12 @@ export function InsightDrawer({
             </div>
           </Card>
           <div className="flex flex-col gap-3">
-            {onApplyFix && <Button onClick={onApplyFix}>Apply Fix</Button>}
+            {onApplyFix && <Button onClick={onApplyFix}>{applyFixLabel ?? "Apply Fix"}</Button>}
+            {onViewLogs && (
+              <Button variant="secondary" onClick={onViewLogs}>
+                View Logs
+              </Button>
+            )}
             {onCreatePr && (
               <Button variant="secondary" onClick={onCreatePr}>
                 Create PR

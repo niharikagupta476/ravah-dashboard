@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getRequestContext } from "@/lib/context";
 import { z } from "zod";
 
 export async function GET() {
-  const [pipelines, alerts, incidents, pipelineRuns] = await Promise.all([
-    prisma.pipeline.findMany(),
+  const context = await getRequestContext();
+  if (!context) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const [pipelines, alerts, incidents, activities] = await Promise.all([
+    prisma.pipeline.findMany({ where: { orgId: context.orgId, projectId: context.projectId } }),
     prisma.alertGroup.findMany(),
     prisma.incident.findMany(),
-    prisma.pipelineRun.findMany({
-      orderBy: { startedAt: "desc" },
-      take: 5,
-      include: { pipeline: true }
+    prisma.activity.findMany({
+      where: { orgId: context.orgId, projectId: context.projectId },
+      orderBy: { createdAt: "desc" },
+      take: 5
     })
   ]);
 
@@ -20,20 +26,20 @@ export async function GET() {
     ongoingIncidents: incidents.filter((incident) => incident.status !== "resolved").length
   };
 
-  const recentActivity = pipelineRuns.map((run) => ({
-    id: run.id,
-    title: `${run.pipeline.name} ${run.status === "success" ? "completed" : "failed"}`,
-    detail: `${run.pipeline.env} · ${Math.round(run.durationSec / 60)} min`
+  const recentActivity = activities.map((activity) => ({
+    id: activity.id,
+    title: activity.message,
+    detail: new Date(activity.createdAt).toLocaleString()
   }));
 
   const attention = pipelines
-    .filter((pipeline) => pipeline.lastRunStatus !== "success")
+    .filter((pipeline) => pipeline.status.toLowerCase() !== "success")
     .slice(0, 5)
     .map((pipeline) => ({
       id: pipeline.id,
       name: pipeline.name,
-      lastRun: pipeline.updatedAt,
-      status: pipeline.lastRunStatus,
+      lastRun: pipeline.lastRunAt,
+      status: pipeline.status,
       owner: pipeline.owner
     }));
 

@@ -8,40 +8,200 @@ datasource db {
 }
 
 model Pipeline {
-  id                   String        @id @default(cuid())
-  name                 String
-  owner                String
-  env                  String
-  lastRunStatus        String
-  lastRunDurationSec   Int
-  updatedAt            DateTime      @updatedAt
-  runs                 PipelineRun[]
+  id          String        @id @default(cuid())
+  orgId       String
+  projectId   String
+  name        String
+  service     String
+  provider    String   @default("github-actions")
+  repo        String   @default("unknown/repo")
+  branch      String   @default("main")
+  env         String
+  status      String
+  lastRunAt   DateTime
+  durationSec Int
+  owner       String
+  org         Organization  @relation(fields: [orgId], references: [id])
+  project     Project       @relation(fields: [projectId], references: [id])
+  runs        PipelineRun[]
 }
 
 model PipelineRun {
-  id           String          @id @default(cuid())
-  pipelineId   String
-  startedAt    DateTime
-  endedAt      DateTime?
-  status       String
-  durationSec  Int
-  pipeline     Pipeline        @relation(fields: [pipelineId], references: [id])
-  stages       PipelineStage[]
-  insights     Insight[]       @relation("PipelineRunInsights")
+  id         String   @id @default(cuid())
+  pipelineId String
+  orgId      String
+  projectId  String
+  status     String
+  startedAt  DateTime
+  endedAt    DateTime?
+  logsText   String
+  duration   Int      @default(0)
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+  org        Organization @relation(fields: [orgId], references: [id])
+  project    Project @relation(fields: [projectId], references: [id])
+  stages     Stage[]
+  jobs       Job[]
 }
 
-model PipelineStage {
-  id            String        @id @default(cuid())
+model Stage {
+  id            String      @id @default(cuid())
   pipelineRunId String
+  orgId         String
+  projectId     String
   name          String
   status        String
-  startedAt     DateTime
-  endedAt       DateTime?
   errorCode     String?
-  errorSummary  String?
-  run           PipelineRun   @relation(fields: [pipelineRunId], references: [id])
+  errorMessage  String?
+  duration      Int      @default(0)
+  run           PipelineRun @relation(fields: [pipelineRunId], references: [id])
+  org           Organization @relation(fields: [orgId], references: [id])
+  project       Project @relation(fields: [projectId], references: [id])
 }
 
+
+
+model Job {
+  id            String      @id @default(cuid())
+  pipelineRunId String
+  orgId         String
+  projectId     String
+  name          String
+  status        String
+  logs          String
+  duration      Int         @default(0)
+  run           PipelineRun @relation(fields: [pipelineRunId], references: [id])
+  org           Organization @relation(fields: [orgId], references: [id])
+  project       Project     @relation(fields: [projectId], references: [id])
+}
+model Insight {
+  id               String   @id @default(cuid())
+  entityType       String
+  entityId         String
+  orgId            String
+  projectId        String
+  rootCause        String
+  confidence       String
+  suggestedFixJson String
+  riskImpact       String
+  relatedChange    String
+  createdAt        DateTime @default(now())
+  org              Organization @relation(fields: [orgId], references: [id])
+  project          Project @relation(fields: [projectId], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  orgId      String
+  projectId  String
+  message    String
+  createdAt  DateTime @default(now())
+  entityType String
+  entityId   String
+  org        Organization @relation(fields: [orgId], references: [id])
+  project    Project @relation(fields: [projectId], references: [id])
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  projects    Project[]
+  pipelines   Pipeline[]
+  pipelineRuns PipelineRun[]
+  stages      Stage[]
+  jobs        Job[]
+  insights    Insight[]
+  activities  Activity[]
+  integrations IntegrationGithub[]
+}
+
+model User {
+  id        String       @id @default(cuid())
+  githubId  String?      @unique
+  email     String?      @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime     @default(now())
+  memberships Membership[]
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  orgId  String
+  role   String
+  user   User @relation(fields: [userId], references: [id])
+  org    Organization @relation(fields: [orgId], references: [id])
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  repoOwner String
+  repoName  String
+  createdAt DateTime @default(now())
+  org       Organization @relation(fields: [orgId], references: [id])
+  pipelines Pipeline[]
+  pipelineRuns PipelineRun[]
+  stages    Stage[]
+  jobs      Job[]
+  insights  Insight[]
+  activities Activity[]
+  integrations IntegrationGithub[]
+}
+
+model IntegrationGithub {
+  id                 String   @id @default(cuid())
+  orgId              String
+  projectId          String?
+  type               String
+  accessTokenEncrypted String?
+  installationId     String?
+  createdAt          DateTime @default(now())
+  org                Organization @relation(fields: [orgId], references: [id])
+  project            Project? @relation(fields: [projectId], references: [id])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
 model AlertGroup {
   id         String          @id @default(cuid())
   name       String
@@ -52,7 +212,6 @@ model AlertGroup {
   lastSeenAt DateTime
   status     String
   instances  AlertInstance[]
-  insights   Insight[]       @relation("AlertGroupInsights")
 }
 
 model AlertInstance {
@@ -74,7 +233,6 @@ model Incident {
   resolvedAt DateTime?
   owner      String
   events     IncidentEvent[]
-  insights   Insight[]       @relation("IncidentInsights")
 }
 
 model IncidentEvent {
@@ -84,18 +242,4 @@ model IncidentEvent {
   type       String
   message    String
   incident   Incident @relation(fields: [incidentId], references: [id])
-}
-
-model Insight {
-  id              String   @id @default(cuid())
-  entityType      String
-  entityId        String
-  rootCauseJson   String
-  confidence      String
-  suggestedFixJson String
-  riskImpact      String
-  createdAt       DateTime @default(now())
-  pipelineRun     PipelineRun? @relation("PipelineRunInsights", fields: [entityId], references: [id], map: "pipeline_run_fk")
-  alertGroup      AlertGroup?  @relation("AlertGroupInsights", fields: [entityId], references: [id], map: "alert_group_fk")
-  incident        Incident?    @relation("IncidentInsights", fields: [entityId], references: [id], map: "incident_fk")
 }

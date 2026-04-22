@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getPipelines } from "@/lib/pipeline-data";
+import { getRequestContext } from "@/lib/context";
 import { z } from "zod";
 
 const querySchema = z.object({
@@ -8,28 +9,40 @@ const querySchema = z.object({
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const parsed = querySchema.parse({
+  const parsed = querySchema.safeParse({
     status: searchParams.get("status") ?? undefined
   });
 
-  const pipelines = await prisma.pipeline.findMany({
-    orderBy: { updatedAt: "desc" }
-  });
+  if (!parsed.success) {
+    return NextResponse.json({ message: "Invalid query params" }, { status: 400 });
+  }
+
+  const context = await getRequestContext();
+  if (!context) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const pipelines = await getPipelines(context.orgId, context.projectId);
 
   const filtered =
-    parsed.status && parsed.status !== "all"
-      ? pipelines.filter((pipeline) => pipeline.lastRunStatus === parsed.status)
+    parsed.data.status && parsed.data.status !== "all"
+      ? pipelines.filter((pipeline) => pipeline.status.toLowerCase() === parsed.data.status)
       : pipelines;
 
   return NextResponse.json(
     filtered.map((pipeline) => ({
       id: pipeline.id,
       name: pipeline.name,
+      service: pipeline.service,
+      provider: pipeline.provider,
+      repo: pipeline.repo,
+      branch: pipeline.branch,
       owner: pipeline.owner,
       env: pipeline.env,
-      lastRunStatus: pipeline.lastRunStatus,
-      lastRunDurationSec: pipeline.lastRunDurationSec,
-      updatedAt: pipeline.updatedAt
+      status: pipeline.status,
+      durationSec: pipeline.durationSec,
+      lastRunAt: pipeline.lastRunAt,
+      lastRunStatus: pipeline.runs[0]?.status ?? pipeline.status
     }))
   );
 }

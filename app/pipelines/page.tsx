@@ -10,11 +10,16 @@ import { Button } from "@/components/ui/button";
 type Pipeline = {
   id: string;
   name: string;
+  service: string;
+  provider: string;
+  repo: string;
+  branch: string;
   owner: string;
   env: string;
+  status: string;
+  durationSec: number;
+  lastRunAt: string;
   lastRunStatus: string;
-  lastRunDurationSec: number;
-  updatedAt: string;
 };
 
 async function fetchPipelines(status: string): Promise<Pipeline[]> {
@@ -55,11 +60,10 @@ export default function PipelinesPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
             <tr>
-              <th className="px-4 py-3">Pipeline</th>
-              <th className="px-4 py-3">Environment</th>
+              <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Last run</th>
               <th className="px-4 py-3">Duration</th>
-              <th className="px-4 py-3">Owner</th>
             </tr>
           </thead>
           <tbody>
@@ -70,23 +74,22 @@ export default function PipelinesPage() {
                     {pipeline.name}
                   </Link>
                   <p className="text-xs text-slate-400">
-                    Updated {new Date(pipeline.updatedAt).toLocaleString()}
+                    {pipeline.provider} · {pipeline.repo} · {pipeline.branch}
                   </p>
                 </td>
-                <td className="px-4 py-3 text-slate-500 dark:text-slate-300">{pipeline.env}</td>
                 <td className="px-4 py-3">
                   <StatusChip status={pipeline.lastRunStatus} label={pipeline.lastRunStatus} />
                 </td>
                 <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
-                  {Math.round(pipeline.lastRunDurationSec / 60)} min
+                  {new Date(pipeline.lastRunAt).toLocaleString()}
                 </td>
                 <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
-                  {pipeline.owner}
+                  {Math.round(pipeline.durationSec / 60)} min
                 </td>
               </tr>
             )) ?? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-sm text-slate-400">
+                <td colSpan={4} className="px-4 py-6 text-sm text-slate-400">
                   Loading pipelines...
                 </td>
               </tr>

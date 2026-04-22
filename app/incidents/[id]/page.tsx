@@ -16,6 +16,7 @@ async function fetchIncident(id: string) {
 
 async function fetchInsight(entityId: string) {
   const response = await fetch(`/api/insights?entityType=incident&entityId=${entityId}`);
+  if (response.status === 404) return null;
   if (!response.ok) throw new Error("Failed to load insight");
   return response.json();
 }
@@ -137,14 +138,13 @@ export default function IncidentDetailPage() {
         onClose={() => setDrawerOpen(false)}
         data={
           insightData ?? {
-            rootCause: [],
+            rootCause: "",
             confidence: "Low",
             suggestedFix: [],
             riskImpact: "Low"
           }
         }
         mode="incident"
-        onApplyFix={undefined}
         onCreatePr={() => setDrawerOpen(false)}
         onEscalate={() => setDrawerOpen(false)}
       />

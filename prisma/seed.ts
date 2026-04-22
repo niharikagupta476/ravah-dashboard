@@ -1,8 +1,10 @@
 import { prisma } from "../lib/prisma";
 
 async function main() {
+  await prisma.activity.deleteMany();
   await prisma.insight.deleteMany();
-  await prisma.pipelineStage.deleteMany();
+  await prisma.stage.deleteMany();
+  await prisma.job.deleteMany();
   await prisma.pipelineRun.deleteMany();
   await prisma.pipeline.deleteMany();
   await prisma.alertInstance.deleteMany();
@@ -10,214 +12,240 @@ async function main() {
   await prisma.incidentEvent.deleteMany();
   await prisma.incident.deleteMany();
 
-  const pipelines = await prisma.pipeline.createMany({
+  const demoOrg = await prisma.organization.create({
+    data: {
+      name: "Demo Org",
+      slug: "demo"
+    }
+  });
+
+  const demoProject = await prisma.project.create({
+    data: {
+      orgId: demoOrg.id,
+      name: "Demo Project",
+      repoOwner: "demo",
+      repoName: "ravah-demo"
+    }
+  });
+
+  const paymentsPipeline = await prisma.pipeline.create({
+    data: {
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      name: "payments-service-prod",
+      service: "payments-service",
+      provider: "github-actions",
+      repo: "ravah/payments-service",
+      branch: "main",
+      env: "Prod",
+      status: "FAILED",
+      lastRunAt: new Date(Date.now() - 1000 * 60 * 12),
+      durationSec: 780,
+      owner: "Sasha"
+    }
+  });
+
+  const userPipeline = await prisma.pipeline.create({
+    data: {
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      name: "user-service-prod",
+      service: "user-service",
+      provider: "github-actions",
+      repo: "ravah/user-service",
+      branch: "main",
+      env: "Prod",
+      status: "SUCCESS",
+      lastRunAt: new Date(Date.now() - 1000 * 60 * 45),
+      durationSec: 520,
+      owner: "Mina"
+    }
+  });
+
+  const failedRun = await prisma.pipelineRun.create({
+    data: {
+      pipelineId: paymentsPipeline.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      status: "FAILED",
+      startedAt: new Date(Date.now() - 1000 * 60 * 20),
+      endedAt: new Date(Date.now() - 1000 * 60 * 7),
+      logsText:
+        "Deploy step failed with ImagePullBackOff. Image tag not found in registry (ECR).",
+      duration: 780,
+      stages: {
+        createMany: {
+          data: [
+            { name: "Build", status: "SUCCESS", duration: 260, orgId: demoOrg.id, projectId: demoProject.id },
+            { name: "Tests", status: "SUCCESS", duration: 320, orgId: demoOrg.id, projectId: demoProject.id },
+            {
+              name: "Deploy",
+              status: "FAILED",
+              duration: 200,
+              orgId: demoOrg.id,
+              projectId: demoProject.id,
+              errorCode: "ImagePullBackOff",
+              errorMessage: "Image tag not found in registry (ECR)"
+            }
+          ]
+        }
+      }
+    }
+  });
+
+  await prisma.job.createMany({
     data: [
       {
-        name: "Payments API",
-        owner: "Sasha",
-        env: "Prod",
-        lastRunStatus: "failed",
-        lastRunDurationSec: 740
+        pipelineRunId: failedRun.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
+        name: "build-image",
+        status: "SUCCESS",
+        duration: 260,
+        logs: "Build completed."
       },
       {
-        name: "Web Storefront",
-        owner: "Mina",
-        env: "Prod",
-        lastRunStatus: "success",
-        lastRunDurationSec: 612
-      },
-      {
-        name: "Identity Service",
-        owner: "Jon",
-        env: "Staging",
-        lastRunStatus: "success",
-        lastRunDurationSec: 480
-      },
-      {
-        name: "Data Warehouse",
-        owner: "Ravi",
-        env: "Prod",
-        lastRunStatus: "failed",
-        lastRunDurationSec: 920
-      },
-      {
-        name: "Notifications",
-        owner: "Leo",
-        env: "Staging",
-        lastRunStatus: "success",
-        lastRunDurationSec: 510
-      },
-      {
-        name: "Edge Router",
-        owner: "Priya",
-        env: "Prod",
-        lastRunStatus: "success",
-        lastRunDurationSec: 330
+        pipelineRunId: failedRun.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
+        name: "deploy",
+        status: "FAILED",
+        duration: 200,
+        logs: "ImagePullBackOff: manifest unknown for tag"
       }
     ]
   });
 
-  const allPipelines = await prisma.pipeline.findMany();
-  const targetPipeline = allPipelines.find((pipeline) => pipeline.name === "Payments API");
-  const warehousePipeline = allPipelines.find((pipeline) => pipeline.name === "Data Warehouse");
-
-  if (!targetPipeline || !warehousePipeline) {
-    throw new Error("Missing pipeline seed data");
-  }
-
-  const failedRun = await prisma.pipelineRun.create({
+  const successRun = await prisma.pipelineRun.create({
     data: {
-      pipelineId: targetPipeline.id,
-      startedAt: new Date(Date.now() - 1000 * 60 * 20),
-      endedAt: new Date(Date.now() - 1000 * 60 * 8),
-      status: "failed",
-      durationSec: 720,
-      stages: {
-        createMany: {
-          data: [
-            {
-              name: "Start",
-              status: "success",
-              startedAt: new Date(Date.now() - 1000 * 60 * 20),
-              endedAt: new Date(Date.now() - 1000 * 60 * 19)
-            },
-            {
-              name: "Build",
-              status: "success",
-              startedAt: new Date(Date.now() - 1000 * 60 * 19),
-              endedAt: new Date(Date.now() - 1000 * 60 * 16)
-            },
-            {
-              name: "Tests",
-              status: "failed",
-              startedAt: new Date(Date.now() - 1000 * 60 * 16),
-              endedAt: new Date(Date.now() - 1000 * 60 * 12),
-              errorCode: "ImagePullBackOff",
-              errorSummary: "ECR tag mismatch for payments-api:release-482"
-            },
-            {
-              name: "Deploy",
-              status: "pending",
-              startedAt: new Date(Date.now() - 1000 * 60 * 12)
-            }
-          ]
-        }
-      }
-    }
-  });
-
-  await prisma.pipelineRun.create({
-    data: {
-      pipelineId: warehousePipeline.id,
+      pipelineId: userPipeline.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      status: "SUCCESS",
       startedAt: new Date(Date.now() - 1000 * 60 * 50),
-      endedAt: new Date(Date.now() - 1000 * 60 * 35),
-      status: "failed",
-      durationSec: 900,
+      endedAt: new Date(Date.now() - 1000 * 60 * 42),
+      logsText: "Pipeline completed successfully.",
+      duration: 520,
       stages: {
         createMany: {
           data: [
-            {
-              name: "Start",
-              status: "success",
-              startedAt: new Date(Date.now() - 1000 * 60 * 50),
-              endedAt: new Date(Date.now() - 1000 * 60 * 48)
-            },
-            {
-              name: "Build",
-              status: "failed",
-              startedAt: new Date(Date.now() - 1000 * 60 * 48),
-              endedAt: new Date(Date.now() - 1000 * 60 * 44),
-              errorCode: "DependencyMismatch",
-              errorSummary: "Warehouse ETL step pinned to deprecated driver"
-            },
-            {
-              name: "Tests",
-              status: "pending",
-              startedAt: new Date(Date.now() - 1000 * 60 * 44)
-            },
-            {
-              name: "Deploy",
-              status: "pending",
-              startedAt: new Date(Date.now() - 1000 * 60 * 44)
-            }
+            { name: "Build", status: "SUCCESS", duration: 260, orgId: demoOrg.id, projectId: demoProject.id },
+            { name: "Tests", status: "SUCCESS", duration: 320, orgId: demoOrg.id, projectId: demoProject.id },
+            { name: "Deploy", status: "SUCCESS", duration: 120, orgId: demoOrg.id, projectId: demoProject.id }
           ]
         }
       }
     }
   });
 
-  await prisma.pipelineRun.createMany({
-    data: allPipelines
-      .filter((pipeline) => pipeline.id !== targetPipeline.id && pipeline.id !== warehousePipeline.id)
-      .map((pipeline) => ({
-        pipelineId: pipeline.id,
-        startedAt: new Date(Date.now() - 1000 * 60 * 90),
-        endedAt: new Date(Date.now() - 1000 * 60 * 80),
-        status: "success",
-        durationSec: pipeline.lastRunDurationSec
-      }))
+  await prisma.job.createMany({
+    data: [
+      {
+        pipelineRunId: successRun.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
+        name: "build-image",
+        status: "SUCCESS",
+        duration: 260,
+        logs: "Build completed."
+      },
+      {
+        pipelineRunId: successRun.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
+        name: "test",
+        status: "SUCCESS",
+        duration: 140,
+        logs: "All tests passed."
+      },
+      {
+        pipelineRunId: successRun.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
+        name: "deploy",
+        status: "SUCCESS",
+        duration: 120,
+        logs: "Deployment succeeded."
+      }
+    ]
   });
 
-  await prisma.alertGroup.create({
+  await prisma.insight.create({
+    data: {
+      entityType: "pipelineRun",
+      entityId: failedRun.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      rootCause: "Image tag not found in registry (ECR)",
+      confidence: "High",
+      suggestedFixJson: JSON.stringify([
+        "Verify image tag exists",
+        "Update deployment manifest tag",
+        "Retry deploy"
+      ]),
+      riskImpact: "Low",
+      relatedChange: "PR #1842: bump payments image"
+    }
+  });
+
+  await prisma.activity.createMany({
+    data: [
+      {
+        message: "Pipeline run failed at Deploy",
+        entityType: "pipelineRun",
+        entityId: failedRun.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
+        createdAt: new Date(Date.now() - 1000 * 60 * 6)
+      },
+      {
+        message: "Pipeline succeeded: user-service-prod",
+        entityType: "pipeline",
+        entityId: userPipeline.id,
+        orgId: demoOrg.id,
+        projectId: demoProject.id,
+        createdAt: new Date(Date.now() - 1000 * 60 * 40)
+      }
+    ]
+  });
+
+  const alertGroup = await prisma.alertGroup.create({
     data: {
       name: "Payment latency spike",
       service: "payments",
       env: "Prod",
       severity: "critical",
-      count: 18,
-      lastSeenAt: new Date(Date.now() - 1000 * 60 * 3),
+      count: 8,
+      lastSeenAt: new Date(Date.now() - 1000 * 60 * 4),
       status: "open",
       instances: {
         createMany: {
-          data: Array.from({ length: 6 }).map((_, index) => ({
-            timestamp: new Date(Date.now() - 1000 * 60 * (index + 1)),
-            message: "p95 latency above 900ms",
-            fingerprint: `latency-${index}`
-          }))
+          data: [
+            {
+              timestamp: new Date(Date.now() - 1000 * 60 * 4),
+              message: "p95 latency above 900ms",
+              fingerprint: "latency-1"
+            }
+          ]
         }
       }
     }
   });
 
-  await prisma.alertGroup.create({
+  await prisma.insight.create({
     data: {
-      name: "Signal spike",
-      service: "edge-router",
-      env: "Prod",
-      severity: "warning",
-      count: 9,
-      lastSeenAt: new Date(Date.now() - 1000 * 60 * 10),
-      status: "monitoring",
-      instances: {
-        createMany: {
-          data: Array.from({ length: 4 }).map((_, index) => ({
-            timestamp: new Date(Date.now() - 1000 * 60 * (index + 5)),
-            message: "unexpected ingress volume",
-            fingerprint: `signal-${index}`
-          }))
-        }
-      }
-    }
-  });
-
-  await prisma.alertGroup.create({
-    data: {
-      name: "Cache eviction errors",
-      service: "storefront",
-      env: "Staging",
-      severity: "low",
-      count: 5,
-      lastSeenAt: new Date(Date.now() - 1000 * 60 * 20),
-      status: "open",
-      instances: {
-        createMany: {
-          data: Array.from({ length: 3 }).map((_, index) => ({
-            timestamp: new Date(Date.now() - 1000 * 60 * (index + 11)),
-            message: "cache eviction retry",
-            fingerprint: `cache-${index}`
-          }))
-        }
-      }
+      entityType: "alertGroup",
+      entityId: alertGroup.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      rootCause: "Traffic spike from partner batch window",
+      confidence: "Med",
+      suggestedFixJson: JSON.stringify([
+        "Adjust autoscaler target to 65% CPU",
+        "Coordinate batch windows with partners"
+      ]),
+      riskImpact: "Med",
+      relatedChange: "Capacity review scheduled"
     }
   });
 
@@ -227,125 +255,38 @@ async function main() {
       env: "Prod",
       severity: "sev-1",
       status: "mitigated",
-      startedAt: new Date(Date.now() - 1000 * 60 * 120),
+      startedAt: new Date(Date.now() - 1000 * 60 * 180),
       resolvedAt: null,
       owner: "Sasha",
       events: {
         createMany: {
           data: [
             {
-              timestamp: new Date(Date.now() - 1000 * 60 * 110),
+              timestamp: new Date(Date.now() - 1000 * 60 * 160),
               type: "detect",
               message: "Spike in error rate detected"
-            },
-            {
-              timestamp: new Date(Date.now() - 1000 * 60 * 95),
-              type: "mitigate",
-              message: "Traffic shifted to secondary cluster"
-            },
-            {
-              timestamp: new Date(Date.now() - 1000 * 60 * 80),
-              type: "update",
-              message: "Database connection limits adjusted"
             }
           ]
         }
       }
     }
-  });
-
-  const incidentTwo = await prisma.incident.create({
-    data: {
-      title: "Warehouse backfill delay",
-      env: "Staging",
-      severity: "sev-2",
-      status: "open",
-      startedAt: new Date(Date.now() - 1000 * 60 * 240),
-      resolvedAt: null,
-      owner: "Ravi",
-      events: {
-        createMany: {
-          data: [
-            {
-              timestamp: new Date(Date.now() - 1000 * 60 * 220),
-              type: "detect",
-              message: "Batch job latency above SLA"
-            },
-            {
-              timestamp: new Date(Date.now() - 1000 * 60 * 200),
-              type: "investigate",
-              message: "Team investigating dependency mismatch"
-            }
-          ]
-        }
-      }
-    }
-  });
-
-  await prisma.insight.createMany({
-    data: [
-      {
-        entityType: "pipelineRun",
-        entityId: failedRun.id,
-        rootCauseJson: JSON.stringify([
-          "Container image tag mismatch between CI build and deploy stage",
-          "ECR cache contains stale release-481 artifact"
-        ]),
-        confidence: "High",
-        suggestedFixJson: JSON.stringify([
-          "Invalidate ECR cache and redeploy release-482",
-          "Pin deploy step to artifact digest"
-        ]),
-        riskImpact: "Low"
-      },
-      {
-        entityType: "alertGroup",
-        entityId: (await prisma.alertGroup.findFirst({ where: { name: "Signal spike" } }))!.id,
-        rootCauseJson: JSON.stringify([
-          "Ingress spike from partner batch window",
-          "Autoscaler threshold too conservative"
-        ]),
-        confidence: "Med",
-        suggestedFixJson: JSON.stringify([
-          "Adjust autoscaler target to 65% CPU",
-          "Notify partner to stagger batch window"
-        ]),
-        riskImpact: "Med"
-      },
-      {
-        entityType: "incident",
-        entityId: incident.id,
-        rootCauseJson: JSON.stringify([
-          "Primary database connection pool exhausted during peak checkout",
-          "Retry storm amplified queue backlog"
-        ]),
-        confidence: "High",
-        suggestedFixJson: JSON.stringify([
-          "Increase connection pool limit and add circuit breaker",
-          "Align retry budgets with service-tier limits",
-          "Add synthetic checkout load test",
-          "Runbook updated for traffic shift",
-          "Monitoring tuned for early saturation"
-        ]),
-        riskImpact: "High"
-      }
-    ]
   });
 
   await prisma.insight.create({
     data: {
       entityType: "incident",
-      entityId: incidentTwo.id,
-      rootCauseJson: JSON.stringify([
-        "Staging ETL driver out of sync with warehouse schema"
-      ]),
-      confidence: "Med",
+      entityId: incident.id,
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      rootCause: "Primary database connection pool exhausted during peak checkout",
+      confidence: "High",
       suggestedFixJson: JSON.stringify([
-        "Upgrade ETL driver to latest staging schema",
-        "Add schema diff check to pipeline",
-        "Schedule backfill window with analytics"
+        "Increase connection pool limit",
+        "Add circuit breaker for checkout service",
+        "Update runbook for traffic shift"
       ]),
-      riskImpact: "Med"
+      riskImpact: "High",
+      relatedChange: "Incident review scheduled"
     }
   });
 }

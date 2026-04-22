@@ -16,7 +16,7 @@ const navItems = [
     label: "Copilots",
     href: "#",
     children: [
-      { label: "Pipeline Copilot", href: "/pipelines" },
+      { label: "Pipeline Copilot", href: "/copilots/pipeline" },
       { label: "Alert Copilot", href: "/alerts" },
       { label: "RCA Copilot", href: "/incidents" }
     ]

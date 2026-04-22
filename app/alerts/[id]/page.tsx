@@ -17,6 +17,7 @@ async function fetchAlert(id: string) {
 
 async function fetchInsight(entityId: string) {
   const response = await fetch(`/api/insights?entityType=alertGroup&entityId=${entityId}`);
+  if (response.status === 404) return null;
   if (!response.ok) throw new Error("Failed to load insight");
   return response.json();
 }
@@ -128,7 +129,7 @@ export default function AlertDetailPage() {
         onClose={() => setDrawerOpen(false)}
         data={
           insightData ?? {
-            rootCause: [],
+            rootCause: "",
             confidence: "Low",
             suggestedFix: [],
             riskImpact: "Low"
@@ -136,8 +137,6 @@ export default function AlertDetailPage() {
         }
         mode="alert"
         onApplyFix={() => setDrawerOpen(false)}
-        onCreatePr={() => setDrawerOpen(false)}
-        onEscalate={() => setDrawerOpen(false)}
       />
     </div>
   );

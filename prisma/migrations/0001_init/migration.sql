@@ -1,34 +1,52 @@
--- CreateTable
 CREATE TABLE "Pipeline" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
-    "owner" TEXT NOT NULL,
+    "service" TEXT NOT NULL,
     "env" TEXT NOT NULL,
-    "lastRunStatus" TEXT NOT NULL,
-    "lastRunDurationSec" INTEGER NOT NULL,
-    "updatedAt" DATETIME NOT NULL
+    "status" TEXT NOT NULL,
+    "lastRunAt" DATETIME NOT NULL,
+    "durationSec" INTEGER NOT NULL,
+    "owner" TEXT NOT NULL
 );
 
 CREATE TABLE "PipelineRun" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "pipelineId" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
     "startedAt" DATETIME NOT NULL,
     "endedAt" DATETIME,
-    "status" TEXT NOT NULL,
-    "durationSec" INTEGER NOT NULL,
+    "logsText" TEXT NOT NULL,
     CONSTRAINT "PipelineRun_pipelineId_fkey" FOREIGN KEY ("pipelineId") REFERENCES "Pipeline" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "PipelineStage" (
+CREATE TABLE "Stage" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "pipelineRunId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "status" TEXT NOT NULL,
-    "startedAt" DATETIME NOT NULL,
-    "endedAt" DATETIME,
     "errorCode" TEXT,
-    "errorSummary" TEXT,
-    CONSTRAINT "PipelineStage_pipelineRunId_fkey" FOREIGN KEY ("pipelineRunId") REFERENCES "PipelineRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "errorMessage" TEXT,
+    CONSTRAINT "Stage_pipelineRunId_fkey" FOREIGN KEY ("pipelineRunId") REFERENCES "PipelineRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE "Insight" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "rootCause" TEXT NOT NULL,
+    "confidence" TEXT NOT NULL,
+    "suggestedFixJson" TEXT NOT NULL,
+    "riskImpact" TEXT NOT NULL,
+    "relatedChange" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "Activity" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "message" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL
 );
 
 CREATE TABLE "AlertGroup" (
@@ -69,15 +87,4 @@ CREATE TABLE "IncidentEvent" (
     "type" TEXT NOT NULL,
     "message" TEXT NOT NULL,
     CONSTRAINT "IncidentEvent_incidentId_fkey" FOREIGN KEY ("incidentId") REFERENCES "Incident" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE TABLE "Insight" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "entityType" TEXT NOT NULL,
-    "entityId" TEXT NOT NULL,
-    "rootCauseJson" TEXT NOT NULL,
-    "confidence" TEXT NOT NULL,
-    "suggestedFixJson" TEXT NOT NULL,
-    "riskImpact" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
