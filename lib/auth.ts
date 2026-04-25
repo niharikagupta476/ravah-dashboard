@@ -20,9 +20,6 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async redirect({ url, baseUrl }) {
-      // Temporary debugging for OAuth callback redirect resolution.
-      console.info("[auth][redirect]", { url, baseUrl });
-
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`;
       }

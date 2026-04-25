@@ -6,17 +6,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    // Temporary debugging for auth redirect/session troubleshooting.
-    console.info("[auth][login] session", { status, user: session?.user?.email ?? null });
-
     if (status === "authenticated") {
       router.replace("/dashboard");
     }
-  }, [router, session?.user?.email, status]);
+  }, [router, status]);
 
   return (
     <div className="container-page flex min-h-[60vh] flex-col items-center justify-center gap-4">
