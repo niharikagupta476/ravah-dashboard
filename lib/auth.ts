@@ -18,6 +18,25 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn() {
       return true;
+    },
+    async redirect({ url, baseUrl }) {
+      // Temporary debugging for OAuth callback redirect resolution.
+      console.info("[auth][redirect]", { url, baseUrl });
+
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+
+      try {
+        const resolved = new URL(url);
+        if (resolved.origin === baseUrl) {
+          return url;
+        }
+      } catch {
+        // fall through to baseUrl/dashboard
+      }
+
+      return `${baseUrl}/dashboard`;
     }
   },
   events: {

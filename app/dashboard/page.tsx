@@ -1,6 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Card } from "@/components/ui/card";
 import { StatusChip } from "@/components/status-chip";
 
@@ -22,6 +24,12 @@ async function fetchDashboard(): Promise<DashboardData> {
 
 export default function DashboardPage() {
   const { data } = useQuery({ queryKey: ["dashboard"], queryFn: fetchDashboard });
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    // Temporary debugging for session visibility after OAuth callback.
+    console.info("[auth][dashboard] session", { status, user: session?.user?.email ?? null });
+  }, [session?.user?.email, status]);
 
   return (
     <div className="container-page space-y-8">
