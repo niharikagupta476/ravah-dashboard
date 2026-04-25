@@ -119,16 +119,19 @@ model Organization {
   integrations IntegrationGithub[]
 }
 
+// NextAuth Prisma adapter expects this User shape.
+// Keep provider identifiers (like GitHub account IDs) in Account.providerAccountId,
+// not custom User.githubId columns, to avoid adapter lifecycle mismatches.
 model User {
-  id        String       @id @default(cuid())
-  githubId  String?      @unique
-  email     String?      @unique
-  name      String?
-  avatarUrl String?
-  createdAt DateTime     @default(now())
-  memberships Membership[]
-  accounts  Account[]
-  sessions  Session[]
+  id            String       @id @default(cuid())
+  name          String?
+  email         String?      @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime     @default(now())
+  memberships   Membership[]
+  accounts      Account[]
+  sessions      Session[]
 }
 
 model Membership {

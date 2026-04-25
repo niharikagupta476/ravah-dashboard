@@ -7,8 +7,11 @@ Production-ready MVP DevOps control plane UI built with Next.js 14, Prisma, and 
 ```bash
 DATABASE_URL="file:./dev.db"
 NEXTAUTH_SECRET="replace-with-random-secret"
-GITHUB_CLIENT_ID="github-oauth-client-id"
-GITHUB_CLIENT_SECRET="github-oauth-client-secret"
+GITHUB_ID="github-oauth-client-id"
+GITHUB_SECRET="github-oauth-client-secret"
+# Backward-compatible aliases also supported:
+# GITHUB_CLIENT_ID=...
+# GITHUB_CLIENT_SECRET=...
 GITHUB_WEBHOOK_SECRET="webhook-secret"
 DEMO_MODE="true"
 ```
@@ -53,7 +56,7 @@ npx prisma migrate dev
 ## GitHub OAuth setup
 
 1. Create a GitHub OAuth App and set the callback URL to `http://localhost:3000/api/auth/callback/github`.
-2. Add `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `NEXTAUTH_SECRET` to your env.
+2. Add `GITHUB_ID`, `GITHUB_SECRET`, and `NEXTAUTH_SECRET` to your env (or use `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` aliases).
 
 ## GitHub webhook setup (GitHub App)
 

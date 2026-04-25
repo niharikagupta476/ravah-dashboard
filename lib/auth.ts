@@ -2,30 +2,28 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import GitHubProvider from "next-auth/providers/github";
 import type { NextAuthOptions } from "next-auth";
 import { prisma } from "@/lib/prisma";
+import { getAuthEnv } from "@/lib/env";
+
+const authEnv = getAuthEnv();
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "database" },
   providers: [
     GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID ?? "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? ""
+      clientId: authEnv.githubClientId,
+      clientSecret: authEnv.githubClientSecret
     })
   ],
   callbacks: {
+    async signIn() {
+      return true;
+    }
+  },
+  events: {
     async signIn({ user, account }) {
-      if (!user.email) return true;
-
-      if (account?.provider === "github" && account.providerAccountId) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            githubId: account.providerAccountId,
-            avatarUrl: user.image ?? undefined
-          }
-        });
-      }
-
+      // Run org bootstrap after adapter user/account persistence to avoid
+      // update-on-missing-user failures in OAuth callback flow.
       const existingMembership = await prisma.membership.findFirst({
         where: { userId: user.id },
         include: { org: true }
@@ -65,12 +63,10 @@ export const authOptions: NextAuthOptions = {
           }
         });
       }
-
-      return true;
     }
   },
   pages: {
     signIn: "/login"
   },
-  secret: process.env.NEXTAUTH_SECRET
+  secret: authEnv.nextAuthSecret
 };
