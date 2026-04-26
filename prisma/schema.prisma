@@ -151,6 +151,9 @@ model Project {
   name      String
   repoOwner String
   repoName  String
+  /// Soft-delete flag — false means repo has been disconnected.
+  /// Pipelines for inactive projects are excluded from future syncs/queries.
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   org       Organization @relation(fields: [orgId], references: [id])
   pipelines Pipeline[]

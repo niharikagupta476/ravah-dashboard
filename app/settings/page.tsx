@@ -7,6 +7,7 @@ import { signIn } from "next-auth/react";
 import { Card } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 type Repo = {
   name: string;
@@ -17,6 +18,8 @@ type Repo = {
   html_url: string;
   connected: boolean;
   projectId: string | null;
+  // isActive: false means the project has been soft-deleted (disconnected)
+  isActive?: boolean;
 };
 
 type SyncSummary = {
@@ -109,9 +112,25 @@ async function syncRepo(repo: Repo, createSample = false): Promise<SyncSummary> 
   return body;
 }
 
+/**
+ * Soft-deletes the repository connection by setting isActive = false on the Project.
+ * Historical pipeline data is preserved; future syncs will skip this repo.
+ */
+async function disconnectRepo(projectId: string): Promise<void> {
+  const response = await fetch("/api/github/disconnect-repo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ projectId })
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.message ?? "Failed to disconnect repository");
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<string | null>(null);
+  // Track which repo is pending disconnect confirmation
+  const [disconnectTarget, setDisconnectTarget] = useState<Repo | null>(null);
 
   const reposQuery = useQuery({
     queryKey: ["github-repositories"],
@@ -150,6 +169,21 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["copilot-pipelines"] });
     },
     onError: (error: Error) => setFeedback(error.message)
+  });
+
+  // Disconnect mutation: soft-deletes the project (isActive = false).
+  // Historical pipeline data is preserved; future syncs will skip this repo.
+  const disconnectMutation = useMutation({
+    mutationFn: (repo: Repo) => disconnectRepo(repo.projectId!),
+    onSuccess: (_, repo) => {
+      setFeedback(`Disconnected ${repo.full_name}. Historical data preserved.`);
+      setDisconnectTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["github-repositories"] });
+    },
+    onError: (error: Error) => {
+      setFeedback(error.message);
+      setDisconnectTarget(null);
+    }
   });
 
   const repos = reposQuery.data?.repos ?? [];
@@ -235,6 +269,17 @@ export default function SettingsPage() {
                 >
                   Sync
                 </Button>
+                {/* Disconnect button: visible only for connected repos */}
+                {repo.connected && repo.projectId && (
+                  <Button
+                    variant="secondary"
+                    disabled={disconnectMutation.isPending}
+                    onClick={() => setDisconnectTarget(repo)}
+                    className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                  >
+                    Disconnect
+                  </Button>
+                )}
                 {process.env.NODE_ENV === "development" ? (
                   <Button
                     variant="secondary"
@@ -266,6 +311,26 @@ export default function SettingsPage() {
           </div>
         ) : null}
       </Card>
+
+      {/* Disconnect confirmation modal */}
+      <Modal open={!!disconnectTarget} onClose={() => setDisconnectTarget(null)}>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Disconnect repository</h3>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-300">
+          Disconnect <span className="font-medium text-slate-800 dark:text-slate-100">{disconnectTarget?.full_name}</span>?
+          Historical runs will remain visible. Future syncs will be stopped.
+        </p>
+        <div className="mt-4 flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => setDisconnectTarget(null)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => disconnectTarget && disconnectMutation.mutate(disconnectTarget)}
+            disabled={disconnectMutation.isPending}
+          >
+            {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

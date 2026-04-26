@@ -14,6 +14,9 @@ import { Modal } from "@/components/ui/modal";
 
 async function fetchPipeline(id: string) {
   const response = await fetch(`/api/pipelines/${id}`);
+  // Fix #3/#4: Distinguish 404 from other errors so the UI can show "not found"
+  // instead of a generic error or infinite loading spinner
+  if (response.status === 404) throw new Error("404: Pipeline not found");
   if (!response.ok) throw new Error("Failed to load pipeline");
   return response.json();
 }
@@ -28,7 +31,15 @@ export default function PipelineDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const queryClient = useQueryClient();
-  const { data } = useQuery({ queryKey: ["pipeline", id], queryFn: () => fetchPipeline(id) });
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["pipeline", id],
+    queryFn: () => fetchPipeline(id),
+    // Fix #4: Don't retry on 404 — avoids prolonged loading on missing pipelines
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message.includes("404")) return false;
+      return failureCount < 2;
+    }
+  });
   const runId = data?.run?.id as string | undefined;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -78,8 +89,22 @@ export default function PipelineDetailPage() {
       }
     : null;
 
-  if (!data) {
-    return <div className="container-page">Loading pipeline...</div>;
+  // Fix #4: Separate loading, error, and not-found states.
+  // Previously `if (!data)` covered all three cases — causing infinite "Loading pipeline..."
+  // when a 404 occurred because data stays undefined after a failed query.
+  if (isLoading) {
+    return <div className="container-page text-sm text-slate-400">Loading pipeline...</div>;
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="container-page space-y-2">
+        <p className="text-sm font-medium text-slate-900 dark:text-white">Pipeline not found</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          This pipeline may have been removed or the link may be incorrect.
+        </p>
+      </div>
+    );
   }
 
   const isFailed = data.status.toLowerCase() === "failed";

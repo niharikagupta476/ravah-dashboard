@@ -4,7 +4,12 @@ import { analyzePipelineRun } from "@/lib/analyze-pipeline-run";
 
 export async function getPipelines(orgId: string, projectId?: string) {
   return prisma.pipeline.findMany({
-    where: { orgId, ...(projectId ? { projectId } : {}) },
+    where: {
+      orgId,
+      ...(projectId ? { projectId } : {}),
+      // Only return pipelines for active (non-disconnected) projects
+      project: { isActive: true }
+    },
     include: {
       runs: {
         orderBy: { startedAt: "desc" },
@@ -72,8 +77,16 @@ export async function getOrCreateInsightForRun(runId: string, orgId: string, pro
 }
 
 export async function getPipelineDetail(pipelineId: string, orgId: string, projectId: string) {
+  // Fix #3: Look up by orgId only (not projectId) to handle multi-project orgs.
+  // The pipeline belongs to the org; requiring an exact projectId match caused
+  // 404s when getRequestContext returned a different project than the pipeline's.
   const pipeline = await prisma.pipeline.findFirst({
-    where: { id: pipelineId, orgId, projectId },
+    where: {
+      id: pipelineId,
+      orgId,
+      // Only include pipelines for active (non-disconnected) projects
+      project: { isActive: true }
+    },
     include: {
       runs: {
         orderBy: { startedAt: "desc" },
@@ -84,12 +97,19 @@ export async function getPipelineDetail(pipelineId: string, orgId: string, proje
 
   if (!pipeline) return null;
 
+  // Use the pipeline's actual projectId (not the one from context, which may differ
+  // in multi-project orgs and was causing 404s in getPipelineDetail previously)
+  const resolvedProjectId = pipeline.projectId;
   const run = pipeline.runs[0];
-  const insight = run ? await getOrCreateInsightForRun(run.id, orgId, projectId) : null;
+
+  const insight = run
+    ? await getOrCreateInsightForRun(run.id, orgId, resolvedProjectId)
+    : null;
+
   const activity = await prisma.activity.findMany({
     where: {
       orgId,
-      projectId,
+      projectId: resolvedProjectId,
       OR: [
         { entityType: "pipeline", entityId: pipeline.id },
         ...(run ? [{ entityType: "pipelineRun", entityId: run.id }] : [])
@@ -133,9 +153,14 @@ export async function getRunDetail(runId: string, orgId: string, projectId: stri
 }
 
 export async function applyFix(pipelineId: string, orgId: string, projectId: string) {
-  const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, orgId, projectId } });
+  // Look up by orgId only — same fix as getPipelineDetail (avoids projectId mismatch
+  // when getRequestContext returns org.projects[0] which may differ from pipeline.projectId)
+  const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, orgId } });
 
   if (!pipeline) return null;
+
+  // Use the pipeline's actual projectId for all writes, not the caller's context projectId
+  const resolvedProjectId = pipeline.projectId;
 
   const startedAt = new Date();
   const endedAt = new Date(startedAt.getTime() + 1000 * 60 * 6);
@@ -146,7 +171,7 @@ export async function applyFix(pipelineId: string, orgId: string, projectId: str
       data: {
         pipelineId: pipeline.id,
         orgId,
-        projectId,
+        projectId: resolvedProjectId,
         status: "SUCCESS",
         startedAt,
         endedAt,
@@ -155,9 +180,9 @@ export async function applyFix(pipelineId: string, orgId: string, projectId: str
         stages: {
           createMany: {
             data: [
-              { name: "Build", status: "SUCCESS", duration: 120, orgId, projectId },
-              { name: "Tests", status: "SUCCESS", duration: 180, orgId, projectId },
-              { name: "Deploy", status: "SUCCESS", duration: 60, orgId, projectId }
+              { name: "Build", status: "SUCCESS", duration: 120, orgId, projectId: resolvedProjectId },
+              { name: "Tests", status: "SUCCESS", duration: 180, orgId, projectId: resolvedProjectId },
+              { name: "Deploy", status: "SUCCESS", duration: 60, orgId, projectId: resolvedProjectId }
             ]
           }
         }
@@ -169,7 +194,7 @@ export async function applyFix(pipelineId: string, orgId: string, projectId: str
         {
           pipelineRunId: run.id,
           orgId,
-          projectId,
+          projectId: resolvedProjectId,
           name: "build-image",
           status: "SUCCESS",
           duration: 120,
@@ -178,7 +203,7 @@ export async function applyFix(pipelineId: string, orgId: string, projectId: str
         {
           pipelineRunId: run.id,
           orgId,
-          projectId,
+          projectId: resolvedProjectId,
           name: "deploy",
           status: "SUCCESS",
           duration: 60,
@@ -202,10 +227,10 @@ export async function applyFix(pipelineId: string, orgId: string, projectId: str
         entityType: "pipeline",
         entityId: pipeline.id,
         orgId,
-        projectId
+        projectId: resolvedProjectId
       }
     });
   });
 
-  return getPipelineDetail(pipelineId, orgId, projectId);
+  return getPipelineDetail(pipelineId, orgId, resolvedProjectId);
 }
