@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { StatusChip } from "@/components/status-chip";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,16 @@ export default function PipelineCopilotPage() {
 
   const pipelines = Array.isArray(data) ? data : data?.pipelines ?? [];
   const setupRequired = !Array.isArray(data) && Boolean(data?.setupRequired);
+
+  useEffect(() => {
+    async function syncRuns() {
+      await fetch("/api/github/sync-runs", { method: "POST" });
+      await queryClient.invalidateQueries({ queryKey: ["copilot-pipelines"] });
+      await queryClient.invalidateQueries({ queryKey: ["pipelines"] });
+    }
+
+    void syncRuns();
+  }, [queryClient]);
 
   return (
     <div className="container-page space-y-6">
