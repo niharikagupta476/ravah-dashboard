@@ -25,12 +25,14 @@ type Pipeline = {
 async function fetchPipelines(status: string): Promise<Pipeline[]> {
   const response = await fetch(`/api/pipelines?status=${status}`);
   if (!response.ok) throw new Error("Failed to load pipelines");
-  return response.json();
+
+  const data = (await response.json()) as Pipeline[] | { pipelines: Pipeline[] };
+  return Array.isArray(data) ? data : data.pipelines;
 }
 
 export default function PipelinesPage() {
   const [status, setStatus] = useState("all");
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["pipelines", status],
     queryFn: () => fetchPipelines(status)
   });
@@ -67,30 +69,38 @@ export default function PipelinesPage() {
             </tr>
           </thead>
           <tbody>
-            {data?.map((pipeline) => (
-              <tr key={pipeline.id} className="border-t border-border-light dark:border-border-dark">
-                <td className="px-4 py-3">
-                  <Link href={`/pipelines/${pipeline.id}`} className="font-medium text-slate-900 dark:text-white">
-                    {pipeline.name}
-                  </Link>
-                  <p className="text-xs text-slate-400">
-                    {pipeline.provider} · {pipeline.repo} · {pipeline.branch}
-                  </p>
-                </td>
-                <td className="px-4 py-3">
-                  <StatusChip status={pipeline.lastRunStatus} label={pipeline.lastRunStatus} />
-                </td>
-                <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
-                  {new Date(pipeline.lastRunAt).toLocaleString()}
-                </td>
-                <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
-                  {Math.round(pipeline.durationSec / 60)} min
-                </td>
-              </tr>
-            )) ?? (
+            {isLoading ? (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-sm text-slate-400">
                   Loading pipelines...
+                </td>
+              </tr>
+            ) : data && data.length > 0 ? (
+              data.map((pipeline) => (
+                <tr key={pipeline.id} className="border-t border-border-light dark:border-border-dark">
+                  <td className="px-4 py-3">
+                    <Link href={`/pipelines/${pipeline.id}`} className="font-medium text-slate-900 dark:text-white">
+                      {pipeline.name}
+                    </Link>
+                    <p className="text-xs text-slate-400">
+                      {pipeline.provider} · {pipeline.repo} · {pipeline.branch}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusChip status={pipeline.lastRunStatus} label={pipeline.lastRunStatus} />
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
+                    {new Date(pipeline.lastRunAt).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 dark:text-slate-300">
+                    {Math.round(pipeline.durationSec / 60)} min
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-sm text-slate-400">
+                  No pipelines found for this workspace.
                 </td>
               </tr>
             )}

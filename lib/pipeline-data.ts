@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { analyzeLogs } from "@/lib/analyze-logs";
 import { analyzePipelineRun } from "@/lib/analyze-pipeline-run";
 
-export async function getPipelines(orgId: string, projectId: string) {
+export async function getPipelines(orgId: string, projectId?: string) {
   return prisma.pipeline.findMany({
-    where: { orgId, projectId },
+    where: { orgId, ...(projectId ? { projectId } : {}) },
     include: {
       runs: {
         orderBy: { startedAt: "desc" },
@@ -103,8 +103,8 @@ export async function getPipelineDetail(pipelineId: string, orgId: string, proje
 }
 
 export async function getRunDetail(runId: string, orgId: string, projectId: string) {
-  const run = await prisma.pipelineRun.findFirst({
-    where: { id: runId, orgId, projectId },
+  const runById = await prisma.pipelineRun.findFirst({
+    where: { id: runId, orgId },
     include: {
       pipeline: true,
       stages: true,
@@ -112,9 +112,20 @@ export async function getRunDetail(runId: string, orgId: string, projectId: stri
     }
   });
 
+  const run =
+    runById ??
+    (await prisma.pipelineRun.findFirst({
+      where: { githubRunId: runId, orgId },
+      include: {
+        pipeline: true,
+        stages: true,
+        jobs: true
+      }
+    }));
+
   if (!run) return null;
 
-  const insight = await getOrCreateInsightForRun(run.id, orgId, projectId);
+  const insight = await getOrCreateInsightForRun(run.id, orgId, run.projectId ?? projectId);
   const analysis = analyzePipelineRun({
     run: {
       id: run.id,

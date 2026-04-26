@@ -86,7 +86,7 @@ export async function GET() {
   const reposRaw = await response.json();
   const repos = z.array(githubRepoSchema).parse(reposRaw);
 
-  const connected = new Set((organization?.projects ?? []).map((project) => `${project.repoOwner}/${project.repoName}`));
+  const connectedProjectsByFullName = new Map((organization?.projects ?? []).map((project) => [`${project.repoOwner}/${project.repoName}`, project.id]));
 
   return NextResponse.json({
     github: {
@@ -112,7 +112,8 @@ export async function GET() {
     })),
     repos: repos.map((repo) => ({
       ...repo,
-      connected: connected.has(repo.full_name)
+      connected: connectedProjectsByFullName.has(repo.full_name),
+      projectId: connectedProjectsByFullName.get(repo.full_name) ?? null
     }))
   });
 }
