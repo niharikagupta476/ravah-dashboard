@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-surface-light text-slate-900 dark:bg-surface-dark dark:text-slate-100;
+}
+
+* {
+  @apply border-border-light dark:border-border-dark;
+}
+
+.container-page {
+  @apply mx-auto w-full max-w-6xl px-6 py-8;
+}
