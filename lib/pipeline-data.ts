@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { analyzeLogs } from "@/lib/analyze-logs";
 import { analyzePipelineRun } from "@/lib/analyze-pipeline-run";
 
-export async function getPipelines(orgId: string, projectId: string) {
+export async function getPipelines(orgId: string, projectId?: string) {
   return prisma.pipeline.findMany({
-    where: { orgId, projectId },
+    where: { orgId, ...(projectId ? { projectId } : {}) },
     include: {
       runs: {
         orderBy: { startedAt: "desc" },

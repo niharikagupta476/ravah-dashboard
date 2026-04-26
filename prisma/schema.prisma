@@ -28,6 +28,7 @@ model Pipeline {
 
 model PipelineRun {
   id         String   @id @default(cuid())
+  githubRunId String?  @unique
   pipelineId String
   orgId      String
   projectId  String
@@ -62,6 +63,7 @@ model Stage {
 
 model Job {
   id            String      @id @default(cuid())
+  githubJobId   String?     @unique
   pipelineRunId String
   orgId         String
   projectId     String

@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const pipelines = await getPipelines(context.orgId, context.projectId);
+  const pipelines = await getPipelines(context.orgId);
 
   const filtered =
     filterStatus && filterStatus !== "all"
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
         count: responsePipelines.length,
         userId: user?.id ?? null,
         orgIds: user?.memberships.map((membership) => membership.orgId) ?? [context.orgId],
-        projectIds: [context.projectId],
+        projectIds: Array.from(new Set(filtered.map((pipeline) => pipeline.projectId))),
         filterStatus
       }
     };

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { signIn } from "next-auth/react";
@@ -15,6 +16,20 @@ type Repo = {
   updated_at: string;
   html_url: string;
   connected: boolean;
+  projectId: string | null;
+};
+
+type SyncSummary = {
+  ok: boolean;
+  synced: boolean;
+  repo: string;
+  reason?: string;
+  workflowsFetched: number;
+  runsFetched: number;
+  pipelinesUpserted: number;
+  runsUpserted: number;
+  jobsUpserted: number;
+  stagesUpserted: number;
 };
 
 type GithubSettingsResponse = {
@@ -70,10 +85,27 @@ async function connectRepo(repo: Repo) {
   });
 
   const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.message ?? "Failed to connect repository");
-  }
+  if (!response.ok) throw new Error(body.message ?? "Failed to connect repository");
+  return body;
+}
 
+async function syncRepo(repo: Repo, createSample = false): Promise<SyncSummary> {
+  const [owner, name] = repo.full_name.split("/");
+  const response = await fetch("/api/github/sync-runs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      owner,
+      repo: name,
+      fullName: repo.full_name,
+      projectId: repo.projectId,
+      defaultBranch: repo.default_branch,
+      createSample
+    })
+  });
+
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.message ?? "Failed to sync repository");
   return body;
 }
 
@@ -93,9 +125,31 @@ export default function SettingsPage() {
       setFeedback("Repository connected.");
       queryClient.invalidateQueries({ queryKey: ["github-repositories"] });
     },
-    onError: (error: Error) => {
-      setFeedback(error.message);
-    }
+    onError: (error: Error) => setFeedback(error.message)
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: (repo: Repo) => syncRepo(repo, false),
+    onSuccess: (summary) => {
+      if (!summary.synced && summary.reason) {
+        setFeedback(summary.reason);
+      } else {
+        setFeedback(`Synced ${summary.runsFetched} workflow runs for ${summary.repo}.`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["pipelines"] });
+      queryClient.invalidateQueries({ queryKey: ["copilot-pipelines"] });
+    },
+    onError: (error: Error) => setFeedback(error.message)
+  });
+
+  const sampleMutation = useMutation({
+    mutationFn: (repo: Repo) => syncRepo(repo, true),
+    onSuccess: (summary) => {
+      setFeedback(`Created sample pipeline data for ${summary.repo}.`);
+      queryClient.invalidateQueries({ queryKey: ["pipelines"] });
+      queryClient.invalidateQueries({ queryKey: ["copilot-pipelines"] });
+    },
+    onError: (error: Error) => setFeedback(error.message)
   });
 
   const repos = reposQuery.data?.repos ?? [];
@@ -117,9 +171,7 @@ export default function SettingsPage() {
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Account</h2>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-900 dark:text-white">
-              {github?.name ?? github?.login ?? "Signed in user"}
-            </p>
+            <p className="text-sm font-medium text-slate-900 dark:text-white">{github?.name ?? github?.login ?? "Signed in user"}</p>
             <p className="text-sm text-slate-500 dark:text-slate-300">Provider: {github?.provider ?? "github"}</p>
           </div>
           <ThemeToggle />
@@ -130,25 +182,15 @@ export default function SettingsPage() {
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">GitHub Integration</h2>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm text-slate-700 dark:text-slate-200">
-              Connection: {github?.hasToken ? "Connected" : "Reconnect GitHub"}
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-300">
-              Token status: {github?.hasToken ? "Available" : "Missing"}
-            </p>
+            <p className="text-sm text-slate-700 dark:text-slate-200">Connection: {github?.hasToken ? "Connected" : "Reconnect GitHub"}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-300">Token status: {github?.hasToken ? "Available" : "Missing"}</p>
           </div>
           {!github?.hasToken ? (
-            <Button onClick={() => signIn("github", { callbackUrl: "/settings" })}>
-              Reconnect GitHub
-            </Button>
+            <Button onClick={() => signIn("github", { callbackUrl: "/settings" })}>Reconnect GitHub</Button>
           ) : null}
         </div>
         {reposQuery.isLoading ? <p className="text-sm text-slate-400">Loading repositories...</p> : null}
-        {reposQuery.isError ? (
-          <p className="text-sm text-rose-500">
-            Unable to load repositories right now. Please retry or reconnect GitHub.
-          </p>
-        ) : null}
+        {reposQuery.isError ? <p className="text-sm text-rose-500">Unable to load repositories right now. Please retry or reconnect GitHub.</p> : null}
       </Card>
 
       <Card className="space-y-4 p-5">
@@ -172,25 +214,13 @@ export default function SettingsPage() {
 
         <div className="space-y-3">
           {displayRepos.map((repo) => (
-            <div
-              key={repo.full_name}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border-light p-3 dark:border-border-dark"
-            >
+            <div key={repo.full_name} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border-light p-3 dark:border-border-dark">
               <div>
                 <p className="text-sm font-medium text-slate-900 dark:text-white">{repo.full_name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-300">
-                  {repo.private ? "Private" : "Public"} · Default branch: {repo.default_branch}
-                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-300">{repo.private ? "Private" : "Public"} · Default branch: {repo.default_branch}</p>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={repo.html_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-slate-500 underline hover:text-slate-700 dark:text-slate-300"
-                >
-                  Open
-                </a>
+                <a href={repo.html_url} target="_blank" rel="noreferrer" className="text-xs text-slate-500 underline hover:text-slate-700 dark:text-slate-300">Open</a>
                 <Button
                   variant={repo.connected ? "secondary" : "primary"}
                   disabled={repo.connected || connectMutation.isPending}
@@ -198,9 +228,31 @@ export default function SettingsPage() {
                 >
                   {repo.connected ? "Connected" : "Connect repo"}
                 </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!repo.connected || !repo.projectId || syncMutation.isPending}
+                  onClick={() => syncMutation.mutate(repo)}
+                >
+                  Sync
+                </Button>
+                {process.env.NODE_ENV === "development" ? (
+                  <Button
+                    variant="secondary"
+                    disabled={!repo.connected || !repo.projectId || sampleMutation.isPending}
+                    onClick={() => sampleMutation.mutate(repo)}
+                  >
+                    Create sample pipeline data
+                  </Button>
+                ) : null}
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="pt-2">
+          <Link href="/copilots/pipeline" className="text-sm text-indigo-600 hover:underline dark:text-indigo-300">
+            View in Pipeline Copilot
+          </Link>
         </div>
 
         {connectedProjects.length > 0 ? (
