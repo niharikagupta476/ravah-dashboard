@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useRef, useState, useEffect } from "react";
-import { useSession, signOut, signIn } from "next-auth/react";
+import { ReactNode, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -24,96 +23,6 @@ const navItems = [
   },
   { label: "Settings", href: "/settings" }
 ];
-
-/**
- * UserMenu — shows GitHub avatar + name when authenticated,
- * with a dropdown for Settings and Logout.
- * Falls back to "Continue with GitHub" when unauthenticated.
- */
-function UserMenu() {
-  const { data: session, status } = useSession();
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  if (status === "loading") {
-    return <div className="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />;
-  }
-
-  if (!session?.user) {
-    return (
-      <Button variant="secondary" onClick={() => signIn("github", { callbackUrl: "/dashboard" })}>
-        Continue with GitHub
-      </Button>
-    );
-  }
-
-  const displayName = session.user.name ?? session.user.email ?? "User";
-  const avatarUrl = session.user.image;
-
-  return (
-    <div className="relative" ref={menuRef}>
-      <button
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-        aria-haspopup="true"
-        aria-expanded={open}
-      >
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt={displayName} className="h-7 w-7 rounded-full" />
-        ) : (
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-300 text-xs font-semibold text-slate-700 dark:bg-slate-600 dark:text-slate-100">
-            {displayName.charAt(0).toUpperCase()}
-          </span>
-        )}
-        <span className="hidden max-w-[120px] truncate md:block">{displayName}</span>
-        {/* Chevron */}
-        <svg className="h-3 w-3 text-slate-400" viewBox="0 0 12 12" fill="currentColor">
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 w-44 rounded-md border border-border-light bg-panel-light py-1 shadow-lg dark:border-border-dark dark:bg-panel-dark">
-          <div className="border-b border-border-light px-3 py-2 dark:border-border-dark">
-            <p className="truncate text-xs font-medium text-slate-900 dark:text-white">{displayName}</p>
-            {session.user.email && (
-              <p className="truncate text-xs text-slate-400">{session.user.email}</p>
-            )}
-          </div>
-          <Link
-            href="/settings"
-            className="flex w-full items-center px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-            onClick={() => setOpen(false)}
-          >
-            Settings
-          </Link>
-          <button
-            className="flex w-full items-center px-3 py-2 text-sm text-rose-600 hover:bg-slate-100 dark:text-rose-400 dark:hover:bg-slate-800"
-            onClick={() => {
-              setOpen(false);
-              // Redirect to /login after sign out
-              signOut({ callbackUrl: "/login" });
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -151,8 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            {/* Fix #2: Replaced static "User" button with proper user menu */}
-            <UserMenu />
+            <Button variant="secondary">User</Button>
           </div>
         </div>
       </div>

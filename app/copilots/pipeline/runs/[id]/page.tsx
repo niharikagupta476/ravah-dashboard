@@ -8,14 +8,21 @@ import { StageFlow } from "@/components/stage-flow";
 
 async function fetchRun(id: string) {
   const response = await fetch(`/api/runs/${id}`);
-  if (!response.ok) throw new Error("Failed to load run");
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("Run not found");
+    throw new Error("Failed to load run");
+  }
   return response.json();
 }
 
 export default function PipelineRunCopilotDetailPage() {
   const params = useParams();
   const id = params?.id as string;
-  const { data } = useQuery({ queryKey: ["pipeline-run", id], queryFn: () => fetchRun(id) });
+  const { data, error, isError } = useQuery({ queryKey: ["pipeline-run", id], queryFn: () => fetchRun(id) });
+
+  if (isError && error instanceof Error && error.message === "Run not found") {
+    return <div className="container-page">Run not found or not synced yet</div>;
+  }
 
   if (!data) {
     return <div className="container-page">Loading run...</div>;
