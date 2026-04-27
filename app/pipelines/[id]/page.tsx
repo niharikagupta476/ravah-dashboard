@@ -14,7 +14,10 @@ import { Modal } from "@/components/ui/modal";
 
 async function fetchPipeline(id: string) {
   const response = await fetch(`/api/pipelines/${id}`);
-  if (!response.ok) throw new Error("Failed to load pipeline");
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("Pipeline not found");
+    throw new Error("Failed to load pipeline");
+  }
   return response.json();
 }
 
@@ -28,7 +31,7 @@ export default function PipelineDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const queryClient = useQueryClient();
-  const { data } = useQuery({ queryKey: ["pipeline", id], queryFn: () => fetchPipeline(id) });
+  const { data, isError, error } = useQuery({ queryKey: ["pipeline", id], queryFn: () => fetchPipeline(id) });
   const runId = data?.run?.id as string | undefined;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -79,6 +82,10 @@ export default function PipelineDetailPage() {
     : null;
 
   if (!data) {
+    if (isError && error instanceof Error && error.message === "Pipeline not found") {
+      return <div className="container-page">Pipeline not found or not synced yet.</div>;
+    }
+
     return <div className="container-page">Loading pipeline...</div>;
   }
 

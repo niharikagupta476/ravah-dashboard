@@ -54,27 +54,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const pipelines = await getPipelines(context.orgId);
+  const pipelines = await getPipelines(context.orgId, context.projectId);
 
   const filtered =
     filterStatus && filterStatus !== "all"
       ? pipelines.filter((pipeline) => pipeline.status.toLowerCase() === filterStatus.toLowerCase())
       : pipelines;
 
-  const responsePipelines = filtered.map((pipeline) => ({
-    id: pipeline.id,
-    name: pipeline.name,
-    service: pipeline.service,
-    provider: pipeline.provider,
-    repo: pipeline.repo,
-    branch: pipeline.branch,
-    owner: pipeline.owner,
-    env: pipeline.env,
-    status: pipeline.status,
-    durationSec: pipeline.durationSec,
-    lastRunAt: pipeline.lastRunAt,
-    lastRunStatus: pipeline.runs[0]?.status ?? pipeline.status
-  }));
+  const responsePipelines = filtered
+    .filter((pipeline) => !pipeline.id.startsWith("ghwf-") && !pipeline.id.startsWith("sample-"))
+    .map((pipeline) => ({
+      id: pipeline.id,
+      displayId: pipeline.id.slice(0, 8),
+      externalWorkflowId: null,
+      githubWorkflowId: null,
+      name: pipeline.name,
+      service: pipeline.service,
+      provider: pipeline.provider,
+      repo: pipeline.repo,
+      branch: pipeline.branch,
+      owner: pipeline.owner,
+      env: pipeline.env,
+      status: pipeline.status,
+      durationSec: pipeline.durationSec,
+      lastRunAt: pipeline.lastRunAt,
+      lastRunStatus: pipeline.runs[0]?.status ?? pipeline.status
+    }));
 
   if (process.env.NODE_ENV === "development") {
     const user = session?.user?.email
