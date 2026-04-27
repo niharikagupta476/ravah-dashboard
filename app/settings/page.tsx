@@ -109,6 +109,18 @@ async function syncRepo(repo: Repo, createSample = false): Promise<SyncSummary> 
   return body;
 }
 
+async function disconnectRepo(repo: Repo) {
+  if (!repo.projectId) throw new Error("Repository is not connected");
+  const response = await fetch("/api/github/disconnect-repo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ projectId: repo.projectId })
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.message ?? "Failed to disconnect repository");
+  return body;
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -146,6 +158,16 @@ export default function SettingsPage() {
     mutationFn: (repo: Repo) => syncRepo(repo, true),
     onSuccess: (summary) => {
       setFeedback(`Created sample pipeline data for ${summary.repo}.`);
+      queryClient.invalidateQueries({ queryKey: ["pipelines"] });
+      queryClient.invalidateQueries({ queryKey: ["copilot-pipelines"] });
+    },
+    onError: (error: Error) => setFeedback(error.message)
+  });
+  const disconnectMutation = useMutation({
+    mutationFn: disconnectRepo,
+    onSuccess: () => {
+      setFeedback("Repository disconnected.");
+      queryClient.invalidateQueries({ queryKey: ["github-repositories"] });
       queryClient.invalidateQueries({ queryKey: ["pipelines"] });
       queryClient.invalidateQueries({ queryKey: ["copilot-pipelines"] });
     },
@@ -234,6 +256,13 @@ export default function SettingsPage() {
                   onClick={() => syncMutation.mutate(repo)}
                 >
                   Sync
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!repo.connected || !repo.projectId || disconnectMutation.isPending}
+                  onClick={() => disconnectMutation.mutate(repo)}
+                >
+                  Disconnect
                 </Button>
                 {process.env.NODE_ENV === "development" ? (
                   <Button

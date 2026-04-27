@@ -25,13 +25,17 @@ export async function GET(request: Request) {
     where: {
       entityType: parsed.entityType,
       entityId: parsed.entityId,
-      orgId: context.orgId,
-      projectId: context.projectId
+      orgId: { in: context.orgIds },
+      ...(context.projectIds.length ? { projectId: { in: context.projectIds } } : {})
     }
   });
 
   if (!insight && parsed.entityType === "pipelineRun") {
-    insight = await getOrCreateInsightForRun(parsed.entityId, context.orgId, context.projectId);
+    const insightProjectId = context.projectId ?? context.projectIds[0];
+    if (!insightProjectId) {
+      return NextResponse.json({ message: "Project context not found" }, { status: 404 });
+    }
+    insight = await getOrCreateInsightForRun(parsed.entityId, context.orgId, insightProjectId);
   }
 
   if (!insight) {

@@ -22,7 +22,12 @@ export async function POST(
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const detail = await applyFix(id, context.orgId, context.projectId);
+  const selectedProjectId = context.projectId ?? context.projectIds[0];
+  if (!selectedProjectId) {
+    return NextResponse.json({ message: "Project context not found" }, { status: 404 });
+  }
+
+  const detail = await applyFix(id, context.orgId, selectedProjectId);
 
   if (!detail) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });

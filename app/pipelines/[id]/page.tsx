@@ -106,7 +106,10 @@ export default function PipelineDetailPage() {
       <Card className="p-5">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Stage flow</h2>
         <div className="mt-4">
-          <StageFlow stages={stages} current={stages.find((stage) => stage.status === "failed")?.name ?? ""} />
+          <StageFlow
+            stages={stages}
+            current={stages.find((stage: { name: string; status: string }) => stage.status === "failed")?.name ?? ""}
+          />
         </div>
       </Card>
 

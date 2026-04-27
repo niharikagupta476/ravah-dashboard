@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const detail = await getRunDetail(parsed.data.runId, context.orgId, context.projectId);
+  const detail = await getRunDetail(parsed.data.runId, context.orgId, context.projectId ?? "");
   if (!detail) {
     return NextResponse.json({ message: "Run not found" }, { status: 404 });
   }

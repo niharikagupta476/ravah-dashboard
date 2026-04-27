@@ -71,9 +71,22 @@ export async function getOrCreateInsightForRun(runId: string, orgId: string, pro
   });
 }
 
-export async function getPipelineDetail(pipelineId: string, orgId: string, projectId: string) {
+export async function getPipelineDetail(
+  pipelineId: string,
+  orgId: string,
+  projectId: string,
+  orgIds?: string[],
+  projectIds?: string[]
+) {
+  const accessibleOrgIds = orgIds?.length ? orgIds : [orgId];
+  const accessibleProjectIds = projectIds?.length ? projectIds : [projectId];
+
   const pipeline = await prisma.pipeline.findFirst({
-    where: { id: pipelineId, orgId, projectId },
+    where: {
+      id: pipelineId,
+      orgId: { in: accessibleOrgIds },
+      projectId: { in: accessibleProjectIds }
+    },
     include: {
       runs: {
         orderBy: { startedAt: "desc" },
@@ -85,11 +98,11 @@ export async function getPipelineDetail(pipelineId: string, orgId: string, proje
   if (!pipeline) return null;
 
   const run = pipeline.runs[0];
-  const insight = run ? await getOrCreateInsightForRun(run.id, orgId, projectId) : null;
+  const insight = run ? await getOrCreateInsightForRun(run.id, pipeline.orgId, pipeline.projectId) : null;
   const activity = await prisma.activity.findMany({
     where: {
-      orgId,
-      projectId,
+      orgId: pipeline.orgId,
+      projectId: pipeline.projectId,
       OR: [
         { entityType: "pipeline", entityId: pipeline.id },
         ...(run ? [{ entityType: "pipelineRun", entityId: run.id }] : [])

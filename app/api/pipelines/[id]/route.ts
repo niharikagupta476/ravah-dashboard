@@ -22,7 +22,7 @@ export async function GET(
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const detail = await getPipelineDetail(id, context.orgId, context.projectId);
+  const detail = await getPipelineDetail(id, context.orgId, context.projectId ?? "", context.orgIds, context.projectIds);
 
   if (!detail) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });

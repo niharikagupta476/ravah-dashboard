@@ -17,7 +17,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const detail = await getRunDetail(parsedParams.data.id, context.orgId, context.projectId);
+  const detail = await getRunDetail(parsedParams.data.id, context.orgId, context.projectId ?? "");
   if (!detail) {
     const debug =
       process.env.NODE_ENV === "development"

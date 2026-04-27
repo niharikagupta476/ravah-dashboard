@@ -23,17 +23,7 @@ export async function GET() {
     where: { email: session.user.email },
     include: {
       accounts: true,
-      memberships: {
-        include: {
-          org: {
-            include: {
-              projects: {
-                orderBy: { createdAt: "desc" }
-              }
-            }
-          }
-        }
-      }
+      memberships: true
     }
   });
 
@@ -42,7 +32,24 @@ export async function GET() {
   }
 
   const githubAccount = user.accounts.find((account) => account.provider === "github");
-  const organization = user.memberships[0]?.org ?? null;
+  const orgIds = user.memberships.map((membership) => membership.orgId);
+  const organizations = orgIds.length
+    ? await prisma.organization.findMany({
+        where: { id: { in: orgIds } },
+        include: { projects: { orderBy: { createdAt: "desc" } } },
+        orderBy: { createdAt: "asc" }
+      })
+    : [];
+  const organization = organizations[0] ?? null;
+  const projects = organizations.flatMap((org) => org.projects);
+  const integrations = orgIds.length
+    ? await prisma.integrationGithub.findMany({
+        where: {
+          orgId: { in: orgIds },
+          projectId: { not: null }
+        }
+      })
+    : [];
 
   if (!githubAccount?.access_token) {
     return NextResponse.json(
@@ -56,7 +63,7 @@ export async function GET() {
           image: session.user.image
         },
         organization,
-        projects: organization?.projects ?? [],
+        projects,
         repos: []
       },
       { status: 400 }
@@ -86,7 +93,12 @@ export async function GET() {
   const reposRaw = await response.json();
   const repos = z.array(githubRepoSchema).parse(reposRaw);
 
-  const connectedProjectsByFullName = new Map((organization?.projects ?? []).map((project) => [`${project.repoOwner}/${project.repoName}`, project.id]));
+  const connectedProjectIds = new Set(integrations.map((integration) => integration.projectId).filter(Boolean));
+  const connectedProjectsByFullName = new Map(
+    projects
+      .filter((project) => connectedProjectIds.has(project.id))
+      .map((project) => [`${project.repoOwner}/${project.repoName}`, project.id])
+  );
 
   return NextResponse.json({
     github: {
@@ -103,7 +115,7 @@ export async function GET() {
           slug: organization.slug
         }
       : null,
-    projects: (organization?.projects ?? []).map((project) => ({
+    projects: projects.map((project) => ({
       id: project.id,
       name: project.name,
       full_name: `${project.repoOwner}/${project.repoName}`,

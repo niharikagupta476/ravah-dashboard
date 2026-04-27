@@ -19,6 +19,15 @@ export const authOptions: NextAuthOptions = {
     async signIn() {
       return true;
     },
+    async session({ session, user }) {
+      if (session.user) {
+        session.user.id = user.id;
+        session.user.name = user.name;
+        session.user.email = user.email;
+        session.user.image = user.image;
+      }
+      return session;
+    },
     async redirect({ url, baseUrl }) {
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`;

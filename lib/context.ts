@@ -17,20 +17,46 @@ export async function getRequestContext() {
       return null;
     }
 
-    return { orgId: demoOrg.id, projectId: demoProject.id, demoMode: true };
+    return {
+      orgId: demoOrg.id,
+      projectId: demoProject.id,
+      orgIds: [demoOrg.id],
+      projectIds: demoOrg.projects.map((project) => project.id),
+      userId: null,
+      demoMode: true
+    };
   }
 
+  const userEmail = session?.user?.email;
   const user = await prisma.user.findFirst({
-    where: { email: session.user.email ?? undefined },
-    include: { memberships: { include: { org: { include: { projects: true } } } } }
+    where: { email: userEmail ?? undefined },
+    include: { memberships: true }
   });
 
-  const membership = user?.memberships[0];
-  const project = membership?.org.projects[0];
-
-  if (!membership || !project) {
+  const orgIds = user?.memberships.map((membership) => membership.orgId) ?? [];
+  if (!user || orgIds.length === 0) {
     return null;
   }
 
-  return { orgId: membership.orgId, projectId: project.id, demoMode: false };
+  const projects = await prisma.project.findMany({
+    where: { orgId: { in: orgIds } },
+    orderBy: { createdAt: "asc" }
+  });
+  const projectIds = projects.map((project) => project.id);
+
+  const primaryOrgId = orgIds[0];
+  const primaryProject = projects.find((project) => project.orgId === primaryOrgId) ?? projects[0];
+
+  if (!primaryOrgId) {
+    return null;
+  }
+
+  return {
+    orgId: primaryOrgId,
+    projectId: primaryProject?.id,
+    orgIds,
+    projectIds,
+    userId: user.id,
+    demoMode: false
+  };
 }

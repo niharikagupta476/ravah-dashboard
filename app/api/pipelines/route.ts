@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { getPipelines } from "@/lib/pipeline-data";
 import { getRequestContext } from "@/lib/context";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -54,16 +53,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const pipelines = await getPipelines(context.orgId, context.projectId);
+  const pipelines = await prisma.pipeline.findMany({
+    where: {
+      orgId: { in: context.orgIds },
+      ...(context.projectIds.length ? { projectId: { in: context.projectIds } } : {})
+    },
+    include: {
+      runs: {
+        orderBy: { startedAt: "desc" },
+        take: 1
+      }
+    },
+    orderBy: { lastRunAt: "desc" }
+  });
 
   const filtered =
     filterStatus && filterStatus !== "all"
       ? pipelines.filter((pipeline) => pipeline.status.toLowerCase() === filterStatus.toLowerCase())
       : pipelines;
 
-  const responsePipelines = filtered
-    .filter((pipeline) => !pipeline.id.startsWith("ghwf-") && !pipeline.id.startsWith("sample-"))
-    .map((pipeline) => ({
+  const responsePipelines = filtered.map((pipeline) => ({
       id: pipeline.id,
       displayId: pipeline.id.slice(0, 8),
       externalWorkflowId: null,
@@ -94,8 +103,8 @@ export async function GET(request: Request) {
       debug: {
         count: responsePipelines.length,
         userId: user?.id ?? null,
-        orgIds: user?.memberships.map((membership) => membership.orgId) ?? [context.orgId],
-        projectIds: Array.from(new Set(filtered.map((pipeline) => pipeline.projectId))),
+        orgIds: context.orgIds.length ? context.orgIds : user?.memberships.map((membership) => membership.orgId) ?? [context.orgId],
+        projectIds: context.projectIds.length ? context.projectIds : Array.from(new Set(filtered.map((pipeline) => pipeline.projectId))),
         filterStatus
       }
     };

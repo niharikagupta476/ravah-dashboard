@@ -10,11 +10,19 @@ export async function GET() {
   }
 
   const [pipelines, alerts, incidents, activities] = await Promise.all([
-    prisma.pipeline.findMany({ where: { orgId: context.orgId, projectId: context.projectId } }),
+    prisma.pipeline.findMany({
+      where: {
+        orgId: { in: context.orgIds },
+        ...(context.projectIds.length ? { projectId: { in: context.projectIds } } : {})
+      }
+    }),
     prisma.alertGroup.findMany(),
     prisma.incident.findMany(),
     prisma.activity.findMany({
-      where: { orgId: context.orgId, projectId: context.projectId },
+      where: {
+        orgId: { in: context.orgIds },
+        ...(context.projectIds.length ? { projectId: { in: context.projectIds } } : {})
+      },
       orderBy: { createdAt: "desc" },
       take: 5
     })

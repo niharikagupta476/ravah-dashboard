@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
+import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -27,6 +28,9 @@ const navItems = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { data: session } = useSession();
+  const userName = session?.user?.name ?? session?.user?.email ?? "User";
+  const userImage = session?.user?.image;
 
   return (
     <div className="min-h-screen bg-surface-light dark:bg-surface-dark">
@@ -60,7 +64,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="secondary">User</Button>
+            <div className="flex items-center gap-2">
+              {userImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={userImage} alt={userName} className="h-7 w-7 rounded-full border border-border-light dark:border-border-dark" />
+              ) : null}
+              <Button variant="secondary" onClick={() => signOut({ callbackUrl: "/login" })}>
+                {userName}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
