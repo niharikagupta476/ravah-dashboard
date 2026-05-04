@@ -200,15 +200,7 @@ export async function syncGithubWorkflowRunsForRepo(input: SyncRepoInput): Promi
     throw new Error("Project not found for provided repo/projectId");
   }
 
-  console.info("[sync-runs] start", {
-    userId: user.id,
-    orgId: input.orgId,
-    projectId: input.projectId,
-    repo: input.fullName
-  });
-
   const runsUrl = `https://api.github.com/repos/${input.owner}/${input.repo}/actions/runs?per_page=20`;
-  console.info("[sync-runs] github runs url", runsUrl);
 
   const runsResponse = await fetch(runsUrl, {
     headers: {
@@ -241,7 +233,6 @@ export async function syncGithubWorkflowRunsForRepo(input: SyncRepoInput): Promi
   };
 
   const workflowRuns = payload.workflow_runs ?? [];
-  console.info("[sync-runs] workflow run count", workflowRuns.length);
 
   if (workflowRuns.length === 0) {
     return {
@@ -340,7 +331,6 @@ export async function syncGithubWorkflowRunsForRepo(input: SyncRepoInput): Promi
     runsUpserted += 1;
 
     const jobsUrl = `https://api.github.com/repos/${input.owner}/${input.repo}/actions/runs/${run.id}/jobs`;
-    console.info("[sync-runs] jobs url", jobsUrl);
 
     const jobsResponse = await fetch(jobsUrl, {
       headers: {
@@ -366,7 +356,6 @@ export async function syncGithubWorkflowRunsForRepo(input: SyncRepoInput): Promi
       : { jobs: [] };
 
     const jobs = jobsPayload.jobs ?? [];
-    console.info("[sync-runs] job count", { runId: run.id, count: jobs.length });
 
     await prisma.job.deleteMany({ where: { pipelineRunId: runRecord.id } });
     await prisma.stage.deleteMany({ where: { pipelineRunId: runRecord.id } });
@@ -414,13 +403,6 @@ export async function syncGithubWorkflowRunsForRepo(input: SyncRepoInput): Promi
       stagesUpserted += 1;
     }
   }
-
-  console.info("[sync-runs] prisma upsert counts", {
-    pipelinesUpserted,
-    runsUpserted,
-    jobsUpserted,
-    stagesUpserted
-  });
 
   return {
     ok: true,

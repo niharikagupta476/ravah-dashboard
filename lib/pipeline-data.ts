@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { analyzeLogs } from "@/lib/analyze-logs";
 import { analyzePipelineRun } from "@/lib/analyze-pipeline-run";
+import { analyzeRunWithAI } from "@/lib/ai/analyze-run";
 
 export async function getPipelines(orgId: string, projectId?: string) {
   return prisma.pipeline.findMany({
@@ -29,32 +29,11 @@ export async function getOrCreateInsightForRun(runId: string, orgId: string, pro
 
   if (!run) return null;
 
-  const generated = analyzeLogs(run.logsText);
-
-  const analysis = analyzePipelineRun({
-    run: {
-      id: run.id,
-      pipelineId: run.pipelineId,
-      status: run.status,
-      duration: run.duration,
-      startedAt: run.startedAt,
-      finishedAt: run.endedAt
-    },
-    stages: run.stages.map((stage) => ({
-      id: stage.id,
-      name: stage.name,
-      status: stage.status,
-      duration: stage.duration
-    })),
-    jobs: run.jobs.map((job) => ({
-      id: job.id,
-      name: job.name,
-      status: job.status,
-      logs: job.logs,
-      duration: job.duration
-    })),
-    logsText: run.logsText
-  });
+  const pipeline = await prisma.pipeline.findUnique({ where: { id: run.pipelineId } });
+  if (!pipeline) return null;
+  const failedJobs = run.jobs.filter((job) => job.status.toLowerCase() === "failed");
+  const failedStages = run.stages.filter((stage) => stage.status.toLowerCase() === "failed");
+  const ai = await analyzeRunWithAI({ pipeline, run, jobs: run.jobs, failedJobs, failedStages });
 
   return prisma.insight.create({
     data: {
@@ -62,11 +41,11 @@ export async function getOrCreateInsightForRun(runId: string, orgId: string, pro
       entityId: run.id,
       orgId,
       projectId,
-      rootCause: analysis.rootCause || generated.rootCause,
-      confidence: generated.confidence,
-      suggestedFixJson: JSON.stringify(analysis.recommendations.length ? analysis.recommendations : generated.suggestedFix),
-      riskImpact: generated.riskImpact,
-      relatedChange: generated.relatedChange
+      rootCause: ai.rootCause,
+      confidence: ai.confidence,
+      suggestedFixJson: JSON.stringify(ai),
+      riskImpact: ai.riskImpact,
+      relatedChange: ai.nextSteps[0] ?? "AI-generated RCA"
     }
   });
 }
@@ -139,7 +118,8 @@ export async function getRunDetail(runId: string, orgId: string, projectId: stri
   if (!run) return null;
 
   const insight = await getOrCreateInsightForRun(run.id, orgId, run.projectId ?? projectId);
-  const analysis = analyzePipelineRun({
+  const parsedInsight = insight ? JSON.parse(insight.suggestedFixJson) : null;
+  const analysis = parsedInsight ?? analyzePipelineRun({
     run: {
       id: run.id,
       pipelineId: run.pipelineId,

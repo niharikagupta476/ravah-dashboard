@@ -12,6 +12,8 @@ type PipelineRow = {
   status: string;
   lastRunAt: string;
   durationSec: number;
+  rootCause?: string | null;
+  confidence?: string | null;
 };
 
 type PipelineApiResponse =
@@ -73,12 +75,13 @@ export default function PipelineCopilotPage() {
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Last run</th>
                 <th className="px-4 py-3">Duration</th>
+                <th className="px-4 py-3">AI RCA</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-sm text-slate-400">
+                  <td colSpan={5} className="px-4 py-6 text-sm text-slate-400">
                     Loading pipelines...
                   </td>
                 </tr>
@@ -95,6 +98,13 @@ export default function PipelineCopilotPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-500 dark:text-slate-300">{new Date(pipeline.lastRunAt).toLocaleString()}</td>
                     <td className="px-4 py-3 text-slate-500 dark:text-slate-300">{Math.round(pipeline.durationSec / 60)} min</td>
+                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-300">
+                      <p>{pipeline.rootCause ? `Root cause detected: ${pipeline.rootCause}` : "No RCA yet"}</p>
+                      <p>Confidence: {pipeline.confidence ?? "unknown"}</p>
+                      <Link href={`/pipelines/${pipeline.id}`} className="text-indigo-600 hover:underline dark:text-indigo-300">
+                        Open RCA
+                      </Link>
+                    </td>
                   </tr>
                 ))
               )}

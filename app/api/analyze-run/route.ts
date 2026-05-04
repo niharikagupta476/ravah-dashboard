@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestContext } from "@/lib/context";
-import { getRunDetail } from "@/lib/pipeline-data";
+import { getOrCreateInsightForRun, getRunDetail } from "@/lib/pipeline-data";
 
 const bodySchema = z.object({ runId: z.string() });
 
@@ -23,5 +23,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Run not found" }, { status: 404 });
   }
 
-  return NextResponse.json(detail.analysis);
+  const insight = await getOrCreateInsightForRun(detail.run.id, detail.run.orgId, detail.run.projectId);
+  if (!insight) {
+    return NextResponse.json({ message: "Unable to generate insight" }, { status: 500 });
+  }
+
+  return NextResponse.json(JSON.parse(insight.suggestedFixJson));
 }

@@ -69,16 +69,34 @@ export default function PipelineRunCopilotDetailPage() {
       </Card>
 
       <Card className="p-5">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">System analysis</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">RCA Copilot analysis</h3>
         <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
           <li><span className="font-medium">Summary:</span> {data.analysis.summary}</li>
           <li><span className="font-medium">Root cause:</span> {data.analysis.rootCause}</li>
           <li><span className="font-medium">Failure category:</span> {data.analysis.failureCategory}</li>
+          <li><span className="font-medium">Confidence:</span> {data.analysis.confidence ?? "unknown"}</li>
+          <li><span className="font-medium">Risk impact:</span> {data.analysis.riskImpact ?? "Unknown"}</li>
           <li>
-            <span className="font-medium">Recommendations:</span>
+            <span className="font-medium">Evidence:</span>
             <ul className="ml-5 mt-1 list-disc">
-              {data.analysis.recommendations.map((rec: string) => (
+              {(data.analysis.evidence ?? []).map((e: string) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <span className="font-medium">Suggested fixes:</span>
+            <ul className="ml-5 mt-1 list-disc">
+              {(data.analysis.suggestedFixes ?? data.analysis.recommendations ?? []).map((rec: string) => (
                 <li key={rec}>{rec}</li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <span className="font-medium">Next steps:</span>
+            <ul className="ml-5 mt-1 list-disc">
+              {(data.analysis.nextSteps ?? []).map((step: string) => (
+                <li key={step}>{step}</li>
               ))}
             </ul>
           </li>

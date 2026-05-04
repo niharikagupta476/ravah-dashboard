@@ -32,8 +32,7 @@ export async function POST(request: Request) {
   }
 
   const payload = parsed.data;
-  const user = await prisma.user.findFirst({ where: { email: session.user.email } });
-  console.info("[sync-runs] request", { ...payload, userId: user?.id ?? null, orgId: context.orgId });
+  await prisma.user.findFirst({ where: { email: session.user.email } });
 
   if (context.demoMode) {
     return NextResponse.json({ message: "Sync skipped in demo mode", summary: null }, { status: 200 });

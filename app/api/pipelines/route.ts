@@ -90,6 +90,15 @@ export async function GET(request: Request) {
       lastRunStatus: pipeline.runs[0]?.status ?? pipeline.status
     }));
 
+  const insights = await prisma.insight.findMany({
+    where: {
+      entityType: "pipelineRun",
+      orgId: { in: context.orgIds },
+      ...(context.projectIds.length ? { projectId: { in: context.projectIds } } : {})
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
   if (process.env.NODE_ENV === "development") {
     const user = session?.user?.email
       ? await prisma.user.findFirst({
@@ -99,7 +108,15 @@ export async function GET(request: Request) {
       : null;
 
     const devPayload = {
-      pipelines: responsePipelines,
+      pipelines: responsePipelines.map((pipeline) => {
+        const latestRunId = filtered.find((item) => item.id === pipeline.id)?.runs[0]?.id;
+        const insight = insights.find((item) => item.entityId === latestRunId);
+        return {
+          ...pipeline,
+          rootCause: insight?.rootCause ?? null,
+          confidence: insight?.confidence ?? null
+        };
+      }),
       debug: {
         count: responsePipelines.length,
         userId: user?.id ?? null,
@@ -109,9 +126,18 @@ export async function GET(request: Request) {
       }
     };
 
-    console.info("[api/pipelines] development payload", devPayload);
     return NextResponse.json(devPayload);
   }
 
-  return NextResponse.json(responsePipelines);
+  return NextResponse.json(
+    responsePipelines.map((pipeline) => {
+      const latestRunId = filtered.find((item) => item.id === pipeline.id)?.runs[0]?.id;
+      const insight = insights.find((item) => item.entityId === latestRunId);
+      return {
+        ...pipeline,
+        rootCause: insight?.rootCause ?? null,
+        confidence: insight?.confidence ?? null
+      };
+    })
+  );
 }
