@@ -28,6 +28,17 @@ export default function PipelineRunCopilotDetailPage() {
     return <div className="container-page">Loading run...</div>;
   }
 
+  const analysis = data.analysis ?? {};
+  const stages = Array.isArray(data.stages) ? data.stages : [];
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+  const evidence = Array.isArray(analysis.evidence) ? analysis.evidence : [];
+  const suggestedFixes = Array.isArray(analysis.suggestedFixes)
+    ? analysis.suggestedFixes
+    : Array.isArray(analysis.recommendations)
+      ? analysis.recommendations
+      : [];
+  const nextSteps = Array.isArray(analysis.nextSteps) ? analysis.nextSteps : [];
+
   return (
     <div className="container-page space-y-6">
       <div className="flex items-center justify-between">
@@ -44,7 +55,7 @@ export default function PipelineRunCopilotDetailPage() {
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Stage timeline</h2>
         <div className="mt-4">
           <StageFlow
-            stages={data.stages.map((stage: { name: string; status: string }) => ({
+            stages={stages.map((stage: { name: string; status: string }) => ({
               name: stage.name,
               status:
                 stage.status.toLowerCase() === "success"
@@ -53,7 +64,7 @@ export default function PipelineRunCopilotDetailPage() {
                     ? "failed"
                     : "pending"
             }))}
-            current={data.stages.find((stage: { status: string }) => stage.status.toLowerCase() === "failed")?.name ?? ""}
+            current={stages.find((stage: { status: string }) => stage.status.toLowerCase() === "failed")?.name ?? ""}
           />
         </div>
       </Card>
@@ -61,7 +72,7 @@ export default function PipelineRunCopilotDetailPage() {
       <Card className="p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Failed step & logs</h3>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-300">
-          {data.jobs.find((job: { status: string }) => job.status.toLowerCase() === "failed")?.name ?? "No failed job found"}
+          {jobs.find((job: { status: string }) => job.status.toLowerCase() === "failed")?.name ?? "No failed job found"}
         </p>
         <pre className="mt-3 overflow-x-auto rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
           {data.logsText}
@@ -71,15 +82,15 @@ export default function PipelineRunCopilotDetailPage() {
       <Card className="p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">RCA Copilot analysis</h3>
         <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-          <li><span className="font-medium">Summary:</span> {data.analysis.summary}</li>
-          <li><span className="font-medium">Root cause:</span> {data.analysis.rootCause}</li>
-          <li><span className="font-medium">Failure category:</span> {data.analysis.failureCategory}</li>
-          <li><span className="font-medium">Confidence:</span> {data.analysis.confidence ?? "unknown"}</li>
-          <li><span className="font-medium">Risk impact:</span> {data.analysis.riskImpact ?? "Unknown"}</li>
+          <li><span className="font-medium">Summary:</span> {analysis.summary ?? "Insufficient log context."}</li>
+          <li><span className="font-medium">Root cause:</span> {analysis.rootCause ?? "Insufficient log context."}</li>
+          <li><span className="font-medium">Failure category:</span> {analysis.failureCategory ?? "unknown"}</li>
+          <li><span className="font-medium">Confidence:</span> {analysis.confidence ?? "unknown"}</li>
+          <li><span className="font-medium">Risk impact:</span> {analysis.riskImpact ?? "Unknown"}</li>
           <li>
             <span className="font-medium">Evidence:</span>
             <ul className="ml-5 mt-1 list-disc">
-              {(data.analysis.evidence ?? []).map((e: string) => (
+              {evidence.map((e: string) => (
                 <li key={e}>{e}</li>
               ))}
             </ul>
@@ -87,7 +98,7 @@ export default function PipelineRunCopilotDetailPage() {
           <li>
             <span className="font-medium">Suggested fixes:</span>
             <ul className="ml-5 mt-1 list-disc">
-              {(data.analysis.suggestedFixes ?? data.analysis.recommendations ?? []).map((rec: string) => (
+              {suggestedFixes.map((rec: string) => (
                 <li key={rec}>{rec}</li>
               ))}
             </ul>
@@ -95,7 +106,7 @@ export default function PipelineRunCopilotDetailPage() {
           <li>
             <span className="font-medium">Next steps:</span>
             <ul className="ml-5 mt-1 list-disc">
-              {(data.analysis.nextSteps ?? []).map((step: string) => (
+              {nextSteps.map((step: string) => (
                 <li key={step}>{step}</li>
               ))}
             </ul>
